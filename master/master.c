@@ -492,7 +492,7 @@ int ec_master_thread_start(
         )
 {
     EC_MASTER_INFO(master, "Starting %s thread.\n", name);
-    master->thread = kthread_run(thread_func, master, name);
+    master->thread = kthread_run(thread_func, master, "%s %i", name, master->index);
     if (IS_ERR(master->thread)) {
         int err = (int) PTR_ERR(master->thread);
         EC_MASTER_ERR(master, "Failed to start master thread (error %i)!\n",
@@ -1631,7 +1631,7 @@ void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
 
     EC_MASTER_INFO(master, "Starting EoE thread.\n");
     master->eoe_thread = kthread_run(ec_master_eoe_thread, master,
-            "EtherCAT-EoE");
+            "EtherCAT-EoE %i", master->index);
     if (IS_ERR(master->eoe_thread)) {
         int err = (int) PTR_ERR(master->eoe_thread);
         EC_MASTER_ERR(master, "Failed to start EoE thread (error %i)!\n",

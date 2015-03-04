@@ -159,7 +159,6 @@ ec_slave_config_t *ecrt_master_slave_config(ec_master_t *master,
 {
     ec_ioctl_config_t data;
     ec_slave_config_t *sc;
-    int index;
 
     sc = malloc(sizeof(ec_slave_config_t));
     if (!sc) {
@@ -216,7 +215,7 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
         ec_slave_info_t *slave_info)
 {
     ec_ioctl_slave_t data;
-    int index, i;
+    int i;
 
     data.position = slave_position;
 
@@ -486,7 +485,7 @@ int ecrt_master_activate(ec_master_t *master)
         master->process_data = mmap(0, master->process_data_size,
                 PROT_READ | PROT_WRITE, MAP_SHARED, master->fd, 0);
         if (master->process_data == MAP_FAILED) {
-            fprintf(stderr, "Failed to map process data: %s", strerror(errno));
+            fprintf(stderr, "Failed to map process data: %s\n", strerror(errno));
             master->process_data = NULL;
             master->process_data_size = 0;
             return -1; // FIXME

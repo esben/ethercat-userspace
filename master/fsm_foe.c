@@ -264,7 +264,7 @@ void ec_fsm_foe_write(
     fsm->tx_buffer_offset = 0;
 
     fsm->tx_filename = fsm->request->file_name;
-    fsm->tx_filename_len = strlen(fsm->tx_filename);
+    fsm->tx_filename_len = strlen((char *)fsm->tx_filename);
 
     fsm->state = ec_fsm_foe_write_start;
 }
@@ -608,7 +608,7 @@ void ec_fsm_foe_read(
 {
     fsm->state = ec_fsm_foe_read_start;
     fsm->rx_filename = fsm->request->file_name;
-    fsm->rx_filename_len = strlen(fsm->rx_filename);
+    fsm->rx_filename_len = strlen((char *)fsm->rx_filename);
 
     fsm->rx_buffer = fsm->request->buffer;
     fsm->rx_buffer_size = fsm->request->buffer_size;
@@ -757,7 +757,7 @@ void ec_fsm_foe_state_data_read(
                 fsm->request->error_code);
         if (rec_size > 6) {
             uint8_t text[256];
-            strncpy(text, data + 6, min(rec_size - 6, sizeof(text)));
+            strncpy((char *)text, (char *)data + 6, min(rec_size - 6, sizeof(text)));
             EC_SLAVE_ERR(slave, "FoE Error Text: %s\n", text);
         }
         ec_foe_set_rx_error(fsm, FOE_OPCODE_ERROR);

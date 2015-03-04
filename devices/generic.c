@@ -214,7 +214,7 @@ int ec_gen_device_create_socket(
         return ret;
     }
 
-    printk(KERN_ERR PFX "Binding socket to interface %i (%s).\n",
+    printk(KERN_INFO PFX "Binding socket to interface %i (%s).\n",
             desc->ifindex, desc->name);
 
     memset(&sa, 0x00, sizeof(sa));

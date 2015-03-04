@@ -443,7 +443,7 @@ int ec_cdev_ioctl_slave_sync_pdo(
 
     data.index = pdo->index;
     data.entry_count = ec_pdo_entry_count(pdo);
-    ec_cdev_strcpy(data.name, pdo->name);
+    ec_cdev_strcpy((char *)data.name, pdo->name);
 
     up(&master->master_sem);
 
@@ -510,7 +510,7 @@ int ec_cdev_ioctl_slave_sync_pdo_entry(
     data.index = entry->index;
     data.subindex = entry->subindex;
     data.bit_length = entry->bit_length;
-    ec_cdev_strcpy(data.name, entry->name);
+    ec_cdev_strcpy((char *)data.name, entry->name);
 
     up(&master->master_sem);
 
@@ -747,7 +747,7 @@ int ec_cdev_ioctl_slave_sdo(
 
     data.sdo_index = sdo->index;
     data.max_subindex = sdo->max_subindex;
-    ec_cdev_strcpy(data.name, sdo->name);
+    ec_cdev_strcpy((char *)data.name, sdo->name);
 
     up(&master->master_sem);
 
@@ -825,7 +825,7 @@ int ec_cdev_ioctl_slave_sdo_entry(
         entry->write_access[EC_SDO_ENTRY_ACCESS_SAFEOP];
     data.write_access[EC_SDO_ENTRY_ACCESS_OP] =
         entry->write_access[EC_SDO_ENTRY_ACCESS_OP];
-    ec_cdev_strcpy(data.description, entry->description);
+    ec_cdev_strcpy((char *)data.description, entry->description);
 
     up(&master->master_sem);
 
@@ -858,9 +858,11 @@ int ec_cdev_ioctl_slave_sdo_upload(
         return -ENOMEM;
     }
 
+    size_t data_size;
     ret = ecrt_master_sdo_upload(master, data.slave_position,
             data.sdo_index, data.sdo_entry_subindex, target,
-            data.target_size, &data.data_size, &data.abort_code);
+            data.target_size, &data_size, &data.abort_code);
+    data.data_size = data_size;
 
     if (!ret) {
         if (copy_to_user((void __user *) data.target,
@@ -1314,7 +1316,7 @@ int ec_cdev_ioctl_config_pdo(
 
     data.index = pdo->index;
     data.entry_count = ec_pdo_entry_count(pdo);
-    ec_cdev_strcpy(data.name, pdo->name);
+    ec_cdev_strcpy((char *)data.name, pdo->name);
 
     up(&master->master_sem);
 
@@ -1377,7 +1379,7 @@ int ec_cdev_ioctl_config_pdo_entry(
     data.index = entry->index;
     data.subindex = entry->subindex;
     data.bit_length = entry->bit_length;
-    ec_cdev_strcpy(data.name, entry->name);
+    ec_cdev_strcpy((char *)data.name, entry->name);
 
     up(&master->master_sem);
 
@@ -1543,7 +1545,7 @@ int ec_cdev_ioctl_eoe_handler(
     } else {
         data.slave_position = 0xffff;
     }
-    snprintf(data.name, EC_DATAGRAM_NAME_SIZE, eoe->dev->name);
+    strncpy(data.name, eoe->dev->name, EC_DATAGRAM_NAME_SIZE);
     data.open = eoe->opened;
     data.rx_bytes = eoe->stats.tx_bytes;
     data.rx_rate = eoe->tx_rate;
@@ -3112,7 +3114,7 @@ int ec_cdev_ioctl_slave_foe_read(
         return -EFAULT;
     }
 
-    ec_foe_request_init(&request.req, data.file_name);
+    ec_foe_request_init(&request.req, (uint8_t*)data.file_name);
     ec_foe_request_read(&request.req);
     ec_foe_request_alloc(&request.req, 10000); // FIXME
 
@@ -3210,7 +3212,7 @@ int ec_cdev_ioctl_slave_foe_write(
 
     INIT_LIST_HEAD(&request.list);
 
-    ec_foe_request_init(&request.req, data.file_name);
+    ec_foe_request_init(&request.req, (uint8_t *)data.file_name);
 
     if (ec_foe_request_alloc(&request.req, data.buffer_size)) {
         ec_foe_request_clear(&request.req);

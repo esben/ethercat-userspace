@@ -148,7 +148,7 @@ int ec_eoe_init(
                 "eoe%us%u", slave->master->index, slave->ring_position);
     }
 
-    snprintf(eoe->datagram.name, EC_DATAGRAM_NAME_SIZE, name);
+    strncpy(eoe->datagram.name, name, EC_DATAGRAM_NAME_SIZE);
 
     if (!(eoe->dev = alloc_netdev(sizeof(ec_eoe_t *), name, ether_setup))) {
         EC_SLAVE_ERR(slave, "Unable to allocate net_device %s"

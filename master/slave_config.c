@@ -209,7 +209,7 @@ int ec_slave_config_attach(
     }
 
     if (slave->config) {
-        EC_CONFIG_DBG(sc, 1, "Failed to attach configuration. Slave %u"
+        EC_CONFIG_ERR(sc, "Failed to attach configuration. Slave %u"
                 " already has a configuration!\n", slave->ring_position);
         return -EEXIST;
     }

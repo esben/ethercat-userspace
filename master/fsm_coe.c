@@ -298,7 +298,8 @@ int ec_fsm_coe_check_emergency(
         return 1;
     }
 
-    EC_SLAVE_WARN(fsm->slave, "CoE Emergency Request received:\n"
+    EC_SLAVE_WARN(fsm->slave, "CoE Emergency Request received:\n");
+    EC_SLAVE_WARN(fsm->slave,
             "Error code 0x%04X, Error register 0x%02X, data:\n",
             EC_READ_U16(data + 2), EC_READ_U8(data + 4));
     ec_print_data(data + 5, 5);
@@ -1060,7 +1061,7 @@ void ec_fsm_coe_dict_entry_response(ec_fsm_coe_t *fsm
             }
             memcpy(desc, data + 16, data_size);
             desc[data_size] = 0;
-            entry->description = desc;
+            entry->description = (char *)desc;
         }
 
         list_add_tail(&entry->list, &sdo->entries);

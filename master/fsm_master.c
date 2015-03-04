@@ -804,7 +804,7 @@ void ec_fsm_master_state_scan_slave(
     }
 
     EC_MASTER_INFO(master, "Bus scanning completed in %lu ms.\n",
-            (jiffies - fsm->scan_jiffies) * 1000 / HZ);
+            (unsigned long)(jiffies - fsm->scan_jiffies) * 1000 / HZ);
 
     master->scan_busy = 0;
     wake_up_interruptible(&master->scan_queue);

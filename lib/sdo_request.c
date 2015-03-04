@@ -105,7 +105,7 @@ ec_request_state_t ecrt_sdo_request_state(ec_sdo_request_t *req)
             req->data = malloc(data.size);
             if (!req->data) {
                 req->mem_size = 0;
-                fprintf(stderr, "Failed to allocate %u bytes of SDO data"
+                fprintf(stderr, "Failed to allocate %zu bytes of SDO data"
                         " memory!\n", data.size);
                 return EC_REQUEST_ERROR;
             }
