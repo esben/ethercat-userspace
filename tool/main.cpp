@@ -76,6 +76,9 @@ string commandName;
 Command::StringVector commandArgs;
 
 // option variables
+#ifdef EC_MASTER_IN_USERSPACE
+string MasterDevice::server_host = ""; // server host name
+#endif
 string masters = "-"; // all masters
 string positions = "-"; // all positions
 string aliases = "-"; // all aliases
@@ -112,6 +115,9 @@ string usage()
 
     str << endl
         << "Global options:" << endl
+#ifdef EC_MASTER_IN_USERSPACE
+        << "  --host    -H <host>    Server host name" << endl
+#endif
         << "  --master  -m <master>  Comma separated list of masters" << endl
         << "                         to select, ranges are allowed." << endl
         << "                         Examples: '1,3', '5-7,9', '-3'." << endl
@@ -142,6 +148,9 @@ void getOptions(int argc, char **argv)
 
     static struct option longOptions[] = {
         //name,         has_arg,           flag, val
+#ifdef EC_MASTER_IN_USERSPACE
+        {"host",        required_argument, NULL, 'H'},
+#endif
         {"master",      required_argument, NULL, 'm'},
         {"alias",       required_argument, NULL, 'a'},
         {"position",    required_argument, NULL, 'p'},
@@ -157,9 +166,19 @@ void getOptions(int argc, char **argv)
     };
 
     do {
+#ifdef EC_MASTER_IN_USERSPACE
+        c = getopt_long(argc, argv, "H:m:a:p:d:t:o:fqvhV", longOptions, NULL);
+#else
         c = getopt_long(argc, argv, "m:a:p:d:t:o:fqvhV", longOptions, NULL);
+#endif
 
         switch (c) {
+#ifdef EC_MASTER_IN_USERSPACE
+            case 'H':
+                MasterDevice::server_host = optarg;
+                break;
+#endif
+
             case 'm':
                 masters = optarg;
                 break;

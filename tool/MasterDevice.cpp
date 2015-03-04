@@ -71,10 +71,18 @@ void MasterDevice::open(Permissions perm)
 
     if (fd == -1) { // not already open
         ec_ioctl_module_t module_data;
+
+#ifdef EC_MASTER_IN_USERSPACE
+        deviceName << "TCP socket " << (ECRT_PORT_BASE + index);
+        fd = ioctl_client_open(index,
+               server_host.empty() ? NULL : server_host.c_str());
+#else
         deviceName << "/dev/EtherCAT" << index;
 
-        if ((fd = ::open(deviceName.str().c_str(),
-                        perm == ReadWrite ? O_RDWR : O_RDONLY)) == -1) {
+        fd = ::open(deviceName.str().c_str(),
+                    perm == ReadWrite ? O_RDWR : O_RDONLY);
+#endif
+        if (fd < 0) {
             stringstream err;
             err << "Failed to open master device " << deviceName.str() << ": "
                 << strerror(errno);

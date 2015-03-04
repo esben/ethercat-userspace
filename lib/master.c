@@ -482,8 +482,13 @@ int ecrt_master_activate(ec_master_t *master)
     }
 
     if (master->process_data_size) {
+#ifdef EC_MASTER_IN_USERSPACE
+        master->process_data = MAP_FAILED;  // not yet supported
+        errno = EINVAL;
+#else
         master->process_data = mmap(0, master->process_data_size,
                 PROT_READ | PROT_WRITE, MAP_SHARED, master->fd, 0);
+#endif
         if (master->process_data == MAP_FAILED) {
             fprintf(stderr, "Failed to map process data: %s\n", strerror(errno));
             master->process_data = NULL;

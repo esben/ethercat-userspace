@@ -437,6 +437,16 @@ typedef enum {
 extern "C" {
 #endif
 
+#ifdef EC_MASTER_IN_USERSPACE
+
+int ecrt_init(unsigned int master_count_, const char *const *master_macs,
+              unsigned int backup_count_, const char *const *backup_macs,
+              unsigned int debug_level_);
+
+void ecrt_done(void);
+
+#endif
+
 /** Returns the version magic of the realtime interface.
  *
  * \return Value of ECRT_VERSION_MAGIC() at EtherCAT master compile time.
@@ -507,7 +517,7 @@ int ecrt_master_reserve(
 
 #endif // #ifndef __KERNEL__
 
-#ifdef __KERNEL__
+#if defined(__KERNEL__) || defined(EC_MASTER_IN_USERSPACE)
 
 /** Sets the locking callbacks.
  *
@@ -1293,7 +1303,7 @@ int ecrt_domain_reg_pdo_entry_list(
                                                    registrations. */
         );
 
-#ifdef __KERNEL__
+#if defined(__KERNEL__) || defined(EC_MASTER_IN_USERSPACE)
 
 /** Returns the current size of the domain's process data.
  *
@@ -1630,7 +1640,7 @@ ec_request_state_t ecrt_voe_handler_execute(
  * Byte-swapping functions for user space
  *****************************************************************************/
 
-#ifndef __KERNEL__
+#if defined(EC_MASTER_IN_USERSPACE) || !defined(__KERNEL__)
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 

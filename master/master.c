@@ -93,6 +93,7 @@ static int ec_master_operation_thread(void *);
 static int ec_master_eoe_thread(void *);
 #endif
 void ec_master_find_dc_ref_clock(ec_master_t *);
+void ec_master_nanosleep(const unsigned long nsecs);
 
 /*****************************************************************************/
 
@@ -182,6 +183,12 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     master->thread = NULL;
 
+#ifdef EC_MASTER_IN_USERSPACE
+    INIT_LIST_HEAD(&master->cdev_sockets);
+    master->cdev_thread = NULL;
+    master->cdev_filp = NULL;
+#endif
+
 #ifdef EC_EOE
     master->eoe_thread = NULL;
     INIT_LIST_HEAD(&master->eoe_handlers);
@@ -263,6 +270,11 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     if (ret)
         goto out_clear_sync_mon;
     
+#ifdef EC_MASTER_IN_USERSPACE
+    ret = ec_cdev_thread_start(master);
+    if (ret)
+        goto out_clear_cdev;
+#else
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
     master->class_device = device_create(class, NULL,
             MKDEV(MAJOR(device_number), master->index), NULL,
@@ -285,6 +297,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
         ret = PTR_ERR(master->class_device);
         goto out_clear_cdev;
     }
+#endif
 
     return 0;
 
@@ -315,10 +328,15 @@ void ec_master_clear(
         ec_master_t *master /**< EtherCAT master */
         )
 {
+
+#ifdef EC_MASTER_IN_USERSPACE
+    ec_cdev_thread_stop(master);
+#else
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
     device_unregister(master->class_device);
 #else
     class_device_unregister(master->class_device);
+#endif
 #endif
 
     ec_cdev_clear(&master->cdev);
@@ -528,9 +546,14 @@ void ec_master_thread_stop(
     if (master->fsm_datagram.state != EC_DATAGRAM_SENT)
         return;
     
+#ifdef EC_MASTER_IN_USERSPACE
+    (void)sleep_jiffies;
+    ec_master_nanosleep(10000000);
+#else
     // wait for FSM datagram
     sleep_jiffies = max(HZ / 100, 1); // 10 ms, at least 1 jiffy
     schedule_timeout(sleep_jiffies);
+#endif
 }
 
 /*****************************************************************************/
@@ -1414,6 +1437,17 @@ void ec_master_output_stats(ec_master_t *master /**< EtherCAT master */)
 
 /*****************************************************************************/
 
+#ifdef EC_MASTER_IN_USERSPACE
+
+void ec_master_nanosleep(const unsigned long nsecs)
+{
+    struct timespec t = { 0, nsecs }, r;
+    while (nanosleep(&t, &r) != 0)
+        t = r;
+}
+
+#else
+
 #ifdef EC_USE_HRTIMER
 
 /*
@@ -1486,6 +1520,8 @@ void ec_master_nanosleep(const unsigned long nsecs)
 }
 
 #endif // EC_USE_HRTIMER
+
+#endif // EC_MASTER_IN_USERSPACE
 
 /*****************************************************************************/
 
@@ -1640,8 +1676,13 @@ void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
         return;
     }
 
+#ifdef EC_MASTER_IN_USERSPACE
+    (void)param;
+#else
     sched_setscheduler(master->eoe_thread, SCHED_NORMAL, &param);
     set_user_nice(master->eoe_thread, 0);
+#endif
+
 }
 
 /*****************************************************************************/
@@ -1674,6 +1715,12 @@ static int ec_master_eoe_thread(void *priv_data)
     while (!kthread_should_stop()) {
         none_open = 1;
         all_idle = 1;
+
+#ifdef EC_MASTER_IN_USERSPACE
+        list_for_each_entry(eoe, &master->eoe_handlers, list) {
+            netif_run(eoe->dev);
+        }
+#endif
 
         list_for_each_entry(eoe, &master->eoe_handlers, list) {
             if (ec_eoe_is_open(eoe)) {
@@ -1713,12 +1760,19 @@ static int ec_master_eoe_thread(void *priv_data)
         }
 
 schedule:
+#ifdef EC_MASTER_IN_USERSPACE
+        if (all_idle)
+            ec_master_nanosleep(master->send_interval * 1000);
+        else
+            sched_yield();
+#else
         if (all_idle) {
             set_current_state(TASK_INTERRUPTIBLE);
             schedule_timeout(1);
         } else {
             schedule();
         }
+#endif
     }
     
     EC_MASTER_DBG(master, 1, "EoE thread exiting...\n");

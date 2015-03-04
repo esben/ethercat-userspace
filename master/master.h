@@ -218,6 +218,11 @@ struct ec_master {
     ec_stats_t stats; /**< Cyclic statistics. */
 
     struct task_struct *thread; /**< Master thread. */
+#ifdef EC_MASTER_IN_USERSPACE
+    struct list_head cdev_sockets;
+    struct task_struct *cdev_thread;
+    struct file *cdev_filp;
+#endif
 
 #ifdef EC_EOE
     struct task_struct *eoe_thread; /**< EoE thread. */

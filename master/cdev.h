@@ -56,6 +56,11 @@ typedef struct {
 int ec_cdev_init(ec_cdev_t *, ec_master_t *, dev_t);
 void ec_cdev_clear(ec_cdev_t *);
 
+#ifdef EC_MASTER_IN_USERSPACE
+int ec_cdev_thread_start(ec_master_t *);
+void ec_cdev_thread_stop(ec_master_t *);
+#endif
+
 /*****************************************************************************/
 
 #endif

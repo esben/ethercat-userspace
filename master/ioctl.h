@@ -669,8 +669,251 @@ typedef struct {
 
 /** \endcond */
 
+#ifdef EC_MASTER_IN_USERSPACE
+
+/* Emulated ioctl via TCP connection for userspace master */
+
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+/* Port for the first master. The following masters use subsequent ports. */
+#define ECRT_PORT_BASE 0x88A4
+
+#define EC_MAX_IOCTL_DATA_SIZE 0x1000
+
+static inline ssize_t read_all(int fd, void *data, size_t size)
+{
+  size_t n = 0;
+  while (n < size) {
+      ssize_t r = read(fd, (char *)data + n, size - n);
+      if (r == 0) {
+          errno = EPIPE;
+          return -1;
+      }
+      if (r < 0)
+          return r;
+      n += r;
+  }
+  return size;
+}
+
+static inline ssize_t send_all(int fd, const void *data, size_t size, int has_more)
+{
+  size_t n = 0;
+  while (n < size) {
+      ssize_t r = send(fd, (const char *)data + n, size - n,
+                       has_more ? MSG_MORE : 0);
+      if (r == 0) {
+          errno = EPIPE;
+          return -1;
+      }
+      if (r < 0)
+          return r;
+      n += r;
+  }
+  return size;
+}
+
+static inline struct addrinfo *gai(const char *host, int port, int flags)
+{
+    char service[0x40];
+    snprintf(service, sizeof(service), "%i", port);
+    struct addrinfo hints, *r = NULL;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_flags = AI_ADDRCONFIG | flags;
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    int err = getaddrinfo(host, service, &hints, &r);
+    if (err) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
+        return NULL;
+    }
+    if (!r)
+        fprintf(stderr, "Address not found\n");
+    return r;
+}
+
+#ifdef __KERNEL__
+
+struct socket_list {
+    struct list_head list;
+    int socket;
+};
+
+static inline void ioctl_server_open(int master_index, struct list_head *sockets)
+{
+    struct addrinfo *a = gai(NULL, ECRT_PORT_BASE + master_index, AI_PASSIVE), *p;
+    for (p = a; p; p = p->ai_next) {
+        int r = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (r < 0)
+            continue;
+        int on = 1;
+        struct socket_list *s;
+        if ((p->ai_family != AF_INET6 || setsockopt (r, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof (on)) == 0)
+            && setsockopt(r, SOL_SOCKET, SO_REUSEADDR, (void *)&on, sizeof(on)) == 0
+            && bind(r, p->ai_addr, p->ai_addrlen) == 0
+            && listen(r, 16) == 0
+            && (s = kmalloc(sizeof(struct socket_list), GFP_KERNEL))) {
+            s->socket = r;
+            list_add_tail(&s->list, sockets);
+        } else {
+            close(r);
+        }
+    }
+    freeaddrinfo(a);
+}
+
+#endif
+
+static inline int ioctl_client_open(int master_index, const char *host)
+{
+    int r = -1;
+    struct addrinfo *a = gai(host, ECRT_PORT_BASE + master_index, 0), *p;
+    for (p = a; r < 0 && p; p = p->ai_next) {
+        r = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (r >= 0 && connect(r, p->ai_addr, p->ai_addrlen) < 0) {
+            close(r);
+            r = -1;
+        }
+    }
+    freeaddrinfo(a);
+    return r;
+}
+
+typedef unsigned fmode_t;
+
+#define FMODE_WRITE 2
+
+struct file
+{
+    fmode_t f_mode;
+    void *private_data;
+    void *data_from_user, *data_to_user;
+    size_t data_to_user_size;
+};
+
+struct ioctl_command_block
+{
+    int32_t cmd, data_size;
+    uint32_t data_from_user_size, data_to_user_size;
+};
+
+struct ioctl_reply_block
+{
+    int32_t result;
+    uint32_t data_to_user_size;
+};
+
+static inline int ioctl_server(int fd, long (*ioctl_func) (struct file *filp, unsigned int cmd, unsigned long arg), struct file *filp)
+{
+    struct ioctl_command_block b;
+    if (read_all(fd, &b, sizeof(b)) < 0)
+        return -1;
+    unsigned long value = 0;
+    int use_value = b.data_size < 0;
+    size_t s1 = use_value ? -b.data_size : b.data_size;
+    size_t s2 = use_value ? 0 : b.data_size;
+    if (s1 > EC_MAX_IOCTL_DATA_SIZE || (use_value && s1 != sizeof(value))) {
+        errno = EINVAL;
+        return -1;
+    }
+    void *data = use_value ? &value : alloca(b.data_size);
+    if (read_all(fd, data, s1) < 0)
+        return -1;
+    filp->data_from_user = realloc (filp->data_from_user, b.data_from_user_size);
+    filp->data_to_user   = realloc (filp->data_to_user,   b.data_to_user_size);
+    filp->data_to_user_size = 0;
+    if ((b.data_from_user_size && !filp->data_from_user) ||
+        (b.data_to_user_size   && !filp->data_to_user)) {
+        errno = ENOMEM;
+        return -1;
+    }
+    if (read_all(fd, filp->data_from_user, b.data_from_user_size) < 0)
+        return -1;
+    struct ioctl_reply_block r;
+    r.result = ioctl_func(filp, b.cmd, use_value ? value : (unsigned long)data);
+    r.data_to_user_size = filp->data_to_user_size;
+    if (send_all(fd, &r, sizeof(r), s2 || filp->data_to_user_size) < 0
+        || send_all(fd, data, s2, r.data_to_user_size) < 0
+        || send_all(fd, filp->data_to_user, r.data_to_user_size, 0) < 0)
+        return -1;
+    return 0;
+}
+
+static inline int ioctl_client(int fd, int cmd, ssize_t data_size, void *data)
+{
+    struct ioctl_command_block b = { cmd, (int32_t)data_size, 0, 0 };
+
+    const void *data_from_user = NULL;
+    #define DATA_FROM_USER(CMD, TYPE, DATA, SIZE) \
+      if (cmd == (int)(CMD)) { TYPE *d = (TYPE *)data; data_from_user = (DATA); b.data_from_user_size = (SIZE); } else
+    DATA_FROM_USER (EC_IOCTL_SLAVE_SDO_DOWNLOAD, ec_ioctl_slave_sdo_download_t, d->data,   d->data_size)
+    DATA_FROM_USER (EC_IOCTL_SLAVE_SII_WRITE,    ec_ioctl_slave_sii_t,          d->words,  sizeof(uint16_t) * d->nwords)
+    DATA_FROM_USER (EC_IOCTL_SLAVE_REG_WRITE,    ec_ioctl_slave_reg_t,          d->data,   d->length)
+    DATA_FROM_USER (EC_IOCTL_SC_SDO,             ec_ioctl_sc_sdo_t,             d->data,   d->size)
+    DATA_FROM_USER (EC_IOCTL_SC_IDN,             ec_ioctl_sc_idn_t,             d->data,   d->size)
+    DATA_FROM_USER (EC_IOCTL_SDO_REQUEST_WRITE,  ec_ioctl_sdo_request_t,        d->data,   d->size)
+    DATA_FROM_USER (EC_IOCTL_VOE_WRITE,          ec_ioctl_voe_t,                d->data,   d->size)
+    DATA_FROM_USER (EC_IOCTL_SLAVE_FOE_WRITE,    ec_ioctl_slave_foe_t,          d->buffer, d->buffer_size)
+    DATA_FROM_USER (EC_IOCTL_SLAVE_SOE_WRITE,    ec_ioctl_slave_soe_write_t,    d->data,   d->data_size)
+    { }
+    #undef DATA_FROM_USER
+
+    void *data_to_user = NULL;
+    #define DATA_TO_USER(CMD, TYPE, DATA, SIZE) \
+      if (cmd == (int)(CMD)) { TYPE *d = (TYPE *)data; data_to_user = (DATA); b.data_to_user_size = (SIZE); } else
+    DATA_TO_USER (EC_IOCTL_DOMAIN_DATA,      ec_ioctl_domain_data_t,      d->target, d->data_size)
+    DATA_TO_USER (EC_IOCTL_SLAVE_SDO_UPLOAD, ec_ioctl_slave_sdo_upload_t, d->target, d->target_size)
+    DATA_TO_USER (EC_IOCTL_SLAVE_SII_READ,   ec_ioctl_slave_sii_t,        d->words,  d->nwords * 2)
+    DATA_TO_USER (EC_IOCTL_SLAVE_REG_READ,   ec_ioctl_slave_reg_t,        d->data,   d->length)
+    DATA_TO_USER (EC_IOCTL_SC_STATE,         ec_ioctl_sc_state_t,         d->state,  sizeof(ec_slave_config_state_t))
+    DATA_TO_USER (EC_IOCTL_DOMAIN_STATE,     ec_ioctl_domain_state_t,     d->state,  sizeof(ec_domain_state_t))
+    DATA_TO_USER (EC_IOCTL_SDO_REQUEST_DATA, ec_ioctl_sdo_request_t,      d->data,   d->size)
+    DATA_TO_USER (EC_IOCTL_VOE_DATA,         ec_ioctl_voe_t,              d->data,   d->size)
+    DATA_TO_USER (EC_IOCTL_SLAVE_FOE_READ,   ec_ioctl_slave_foe_t,        d->buffer, d->data_size)
+    DATA_TO_USER (EC_IOCTL_SLAVE_SOE_READ,   ec_ioctl_slave_soe_read_t,   d->data,   d->data_size)
+    { }
+    #undef DATA_TO_USER
+
+    int use_value = data_size < 0;
+    size_t s1 = use_value ? -data_size : data_size;
+    size_t s2 = use_value ? 0 : data_size;
+    struct ioctl_reply_block r;
+    if (send_all(fd, &b, sizeof(b), s1 || b.data_from_user_size) < 0
+        || send_all(fd, data, s1, b.data_from_user_size) < 0
+        || send_all(fd, data_from_user, b.data_from_user_size, 0) < 0
+        || read_all(fd, &r, sizeof(r)) < 0
+        || read_all(fd, data, s2) < 0
+        || read_all(fd, data_to_user, r.data_to_user_size) < 0)
+        return -1;
+    if (r.result < 0) {
+        errno = -r.result;
+        return -1;
+    }
+    return r.result;
+}
+
+#define ioctl_noarg(FD, CMD) (ioctl_client((FD), (CMD), 0, NULL))
+
+static inline int ioctl_value(int fd, int cmd, unsigned long value)
+{
+  return ioctl_client(fd, cmd, -sizeof(value), &value);
+}
+
+#define ioctl_typed(FD, CMD, DATA) (ioctl_client((FD), (CMD), sizeof(*(DATA)), (DATA)))
+
+#else
+
 #define ioctl_noarg(FD, CMD)        (ioctl((FD), (CMD), NULL))
 #define ioctl_value(FD, CMD, VALUE) (ioctl((FD), (CMD), (VALUE)))
 #define ioctl_typed(FD, CMD, DATA)  (ioctl((FD), (CMD), (DATA)))
+
+#endif
 
 #endif

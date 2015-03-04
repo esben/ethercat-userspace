@@ -777,7 +777,20 @@ int ec_eoedev_open(struct net_device *dev /**< EoE net_device */)
 #if EOE_DEBUG_LEVEL >= 2
     EC_SLAVE_DBG(eoe->slave, 0, "%s opened.\n", dev->name);
 #endif
+#ifndef EC_MASTER_IN_USERSPACE
+    /* Not sure if this call is a good idea at all. It just seems to
+       interfere with the normal startup procedure since this function
+       can be called asynchronously. I'd rather take it out entirely,
+       but I don't know why it was added. So I only disable it for the
+       userspace master that I care about, though it probably doesn't
+       really have anything to do with userspace vs. kernel, except that
+       the timing and thus the problem is more reproducible in userspace
+       where this function is called indirectly from netif_run(). When
+       slaves are put to PREOP or OP in due process, EoE will work. Until
+       then, it may lose packets which is OK for an Ethernet device and
+       better than interfering with other parts of the code. -- fh */
     ec_slave_request_state(eoe->slave, EC_SLAVE_STATE_OP);
+#endif
     return 0;
 }
 
@@ -797,7 +810,10 @@ int ec_eoedev_stop(struct net_device *dev /**< EoE net_device */)
 #if EOE_DEBUG_LEVEL >= 2
     EC_SLAVE_DBG(eoe->slave, 0, "%s stopped.\n", dev->name);
 #endif
+#ifndef EC_MASTER_IN_USERSPACE
+    /* see above */
     ec_slave_request_state(eoe->slave, EC_SLAVE_STATE_PREOP);
+#endif
     return 0;
 }
 

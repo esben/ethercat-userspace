@@ -37,6 +37,7 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/version.h>
+#include <linux/netdevice.h>
 #include <linux/if_arp.h> /* ARPHRD_ETHER */
 #include <linux/etherdevice.h>
 
@@ -213,6 +214,10 @@ int ec_gen_device_create_socket(
         printk(KERN_ERR PFX "Failed to create socket (ret = %i).\n", ret);
         return ret;
     }
+
+#ifdef EC_MASTER_IN_USERSPACE
+    netif_up(dev->socket, desc->name);
+#endif
 
     printk(KERN_INFO PFX "Binding socket to interface %i (%s).\n",
             desc->ifindex, desc->name);

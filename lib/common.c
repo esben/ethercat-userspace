@@ -87,9 +87,16 @@ ec_master_t *ecrt_open_master(unsigned int master_index)
     master->first_domain = NULL;
     master->first_config = NULL;
 
+#ifdef EC_MASTER_IN_USERSPACE
+    snprintf(path, MAX_PATH_LEN - 1, "TCP socket %i",
+      ECRT_PORT_BASE + master_index);
+    master->fd = ioctl_client_open(master_index, NULL);
+#else
     snprintf(path, MAX_PATH_LEN - 1, "/dev/EtherCAT%u", master_index);
 
     master->fd = open(path, O_RDWR);
+#endif
+
     if (master->fd == -1) {
         fprintf(stderr, "Failed to open %s: %s\n", path, strerror(errno));
         goto out_clear;

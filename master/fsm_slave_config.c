@@ -34,7 +34,9 @@
 
 /*****************************************************************************/
 
+#ifndef EC_MASTER_IN_USERSPACE
 #include <asm/div64.h>
+#endif
 
 #include "globals.h"
 #include "master.h"

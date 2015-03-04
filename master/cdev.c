@@ -60,6 +60,9 @@
 static int eccdev_open(struct inode *, struct file *);
 static int eccdev_release(struct inode *, struct file *);
 static long eccdev_ioctl(struct file *, unsigned int, unsigned long);
+
+#ifndef EC_MASTER_IN_USERSPACE
+
 static int eccdev_mmap(struct file *, struct vm_area_struct *);
 
 /** This is the kernel version from which the .fault member of the
@@ -96,6 +99,8 @@ struct vm_operations_struct eccdev_vm_ops = {
 #endif
 };
 
+#endif
+
 /*****************************************************************************/
 
 /** Private data structure for file handles.
@@ -108,6 +113,138 @@ typedef struct {
 } ec_cdev_priv_t;
 
 /*****************************************************************************/
+
+#ifdef EC_MASTER_IN_USERSPACE
+
+static int ec_cdev_thread(void *priv_data)
+{
+    ec_master_t *master = (ec_master_t *) priv_data;
+    EC_MASTER_DBG(master, 1, "cdev thread running\n");
+    ec_cdev_t cdev;
+    cdev.master = master;
+    cdev.cdev.owner = NULL;
+    struct inode inode;
+    inode.data = &cdev;
+    struct connection {
+        struct list_head list;
+        int socket;
+        struct file f;
+    };
+    struct list_head connections;
+    INIT_LIST_HEAD(&connections);
+    while (!kthread_should_stop()) {
+        fd_set r;
+        FD_ZERO(&r);
+        int m = 0;
+        struct socket_list *s;
+        list_for_each_entry(s, &master->cdev_sockets, list) {
+            m = max(m, s->socket);
+            FD_SET(s->socket, &r);
+        }
+        struct connection *c, *next;
+        list_for_each_entry(c, &connections, list) {
+            m = max(m, c->socket);
+            FD_SET(c->socket, &r);
+        }
+        if (select(m + 1, &r, NULL, NULL, NULL) <= 0)
+            continue;
+        list_for_each_entry_safe(c, next, &connections, list) {
+            master->cdev_filp = &c->f;
+            if (FD_ISSET(c->socket, &r)
+                  && ioctl_server(c->socket, eccdev_ioctl, &c->f) < 0) {
+                close(c->socket);
+                eccdev_release(&inode, &c->f);
+                list_del(&c->list);
+            }
+        }
+        list_for_each_entry(s, &master->cdev_sockets, list) {
+            int n;
+            if (FD_ISSET(s->socket, &r)
+                && (n = accept(s->socket, NULL, NULL)) > 0) {
+                c = kmalloc(sizeof(struct connection), GFP_KERNEL);
+                if (!c)
+                    close(n);
+                else {
+                    c->socket = n;
+                    c->f.f_mode = FMODE_WRITE;
+                    c->f.data_from_user = NULL;
+                    c->f.data_to_user = NULL;
+                    if (eccdev_open(&inode, &c->f) < 0) {
+                        kfree(c);
+                        close(n);
+                    } else {
+                        list_add_tail(&c->list, &connections);
+                    }
+                }
+            }
+        }
+    }
+    struct connection *c;
+    list_for_each_entry(c, &connections, list) {
+        close(c->socket);
+        free (c->f.data_from_user);
+        free (c->f.data_to_user);
+        eccdev_release(&inode, &c->f);
+    }
+    EC_MASTER_DBG(master, 1, "cdev thread exiting...\n");
+    return 0;
+}
+
+static void ec_close_cdev_sockets(ec_master_t *master)
+{
+    struct socket_list *s, *next;
+    list_for_each_entry_safe(s, next, &master->cdev_sockets, list) {
+        close(s->socket);
+        list_del(&s->list);
+    }
+}
+
+int ec_cdev_thread_start(ec_master_t *master)
+{
+    EC_MASTER_INFO(master, "Starting cdev thread.\n");
+    if (!list_empty(&master->cdev_sockets) || master->cdev_thread) {
+        EC_MASTER_WARN(master, "cdev thread already started!\n");
+        return -EBUSY;
+    }
+    ioctl_server_open(master->index, &master->cdev_sockets);
+    if (list_empty(&master->cdev_sockets)) {
+        EC_MASTER_ERR(master, "Cannot open cdev socket (%s)!\n",
+                      strerror(errno));
+        return -errno;
+    }
+    master->cdev_thread = kthread_run(ec_cdev_thread, master,
+      "EtherCAT-cdev %i", master->index);
+    if (IS_ERR(master->cdev_thread)) {
+        int err = (int) PTR_ERR(master->cdev_thread);
+        EC_MASTER_ERR(master, "Cannot start cdev thread (%s)!\n",
+                      strerror(err));
+        master->cdev_thread = NULL;
+        ec_close_cdev_sockets(master);
+        return err;
+    }
+    return 0;
+}
+
+void ec_cdev_thread_stop(ec_master_t *master)
+{
+    if (!master->cdev_thread)
+        return;
+    EC_MASTER_DBG(master, 1, "Stopping cdev thread.\n");
+    kthread_stop(master->cdev_thread);
+    master->cdev_thread = NULL;
+    ec_close_cdev_sockets(master);
+    EC_MASTER_INFO(master, "cdev thread exited.\n");
+}
+
+#define copy_from_user(DST, SRC, SIZE) \
+  (memcpy((DST), (SRC) == (void *)arg ? (SRC) : master->cdev_filp->data_from_user, (SIZE)), 0)
+
+#define copy_to_user(DST, SRC, SIZE) \
+  (((DST) == (void *)arg ? memcpy((DST), (SRC), (SIZE)) : memcpy(master->cdev_filp->data_to_user, (SRC), (master->cdev_filp->data_to_user_size = (SIZE)))), 0)
+
+#define __copy_to_user copy_to_user
+
+#endif
 
 /** Constructor.
  * 
@@ -166,6 +303,7 @@ void ec_cdev_strcpy(
 /** Get module information.
  */
 int ec_cdev_ioctl_module(
+        ec_master_t *master, /**< EtherCAT master. */
         unsigned long arg /**< Userspace address to store the results. */
         )
 {
@@ -3381,7 +3519,11 @@ int ec_cdev_ioctl_slave_soe_write(
  */
 int eccdev_open(struct inode *inode, struct file *filp)
 {
+#ifdef EC_MASTER_IN_USERSPACE
+    ec_cdev_t *cdev = inode->data;
+#else
     ec_cdev_t *cdev = container_of(inode->i_cdev, ec_cdev_t, cdev);
+#endif
     ec_cdev_priv_t *priv;
 
     priv = kmalloc(sizeof(ec_cdev_priv_t), GFP_KERNEL);
@@ -3448,7 +3590,7 @@ long eccdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
     switch (cmd) {
         case EC_IOCTL_MODULE:
-            ret = ec_cdev_ioctl_module(arg);
+            ret = ec_cdev_ioctl_module(master, arg);
             break;
         case EC_IOCTL_MASTER:
             ret = ec_cdev_ioctl_master(master, arg);
@@ -3864,6 +4006,8 @@ long eccdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     return ret;
 }
 
+#ifndef EC_MASTER_IN_USERSPACE
+
 /*****************************************************************************/
 
 /** Memory-map callback for the EtherCAT character device.
@@ -3956,6 +4100,8 @@ struct page *eccdev_vma_nopage(
 
     return page;
 }
+
+#endif
 
 #endif
 

@@ -44,7 +44,11 @@
  *****************************************************************************/
 
 /** Datagram timeout in microseconds. */
+#ifdef EC_MASTER_IN_USERSPACE
+#define EC_IO_TIMEOUT 2000
+#else
 #define EC_IO_TIMEOUT 500
+#endif
 
 /** SDO injection timeout in microseconds. */
 #define EC_SDO_INJECTION_TIMEOUT 10000

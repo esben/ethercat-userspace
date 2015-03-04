@@ -97,6 +97,10 @@ class MasterDeviceSoeException:
 class MasterDevice
 {
     public:
+#ifdef EC_MASTER_IN_USERSPACE
+        static string server_host;
+#endif
+
         MasterDevice(unsigned int = 0U);
         ~MasterDevice();
 

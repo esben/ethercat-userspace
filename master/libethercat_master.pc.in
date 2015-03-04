@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libethercat_master
+Description: EtherCAT userspace master
+Version: @VERSION@
+Libs: -L${libdir} -lethercat_master -lpthread
+Cflags: -I${includedir} -fno-strict-aliasing -DEC_MASTER_IN_USERSPACE

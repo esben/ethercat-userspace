@@ -103,6 +103,7 @@ int __init ec_init_module(void)
 
     sema_init(&master_sem, 1);
 
+#ifndef EC_MASTER_IN_USERSPACE
     if (master_count) {
         if (alloc_chrdev_region(&device_number,
                     0, master_count, "EtherCAT")) {
@@ -118,6 +119,7 @@ int __init ec_init_module(void)
         ret = PTR_ERR(class);
         goto out_cdev;
     }
+#endif
 
     // zero MAC addresses
     memset(macs, 0x00, sizeof(uint8_t) * MAX_MASTERS * 2 * ETH_ALEN);
@@ -164,11 +166,13 @@ out_free_masters:
         ec_master_clear(&masters[i]);
     kfree(masters);
 out_class:
+#ifndef EC_MASTER_IN_USERSPACE
     class_destroy(class);
 out_cdev:
     if (master_count)
         unregister_chrdev_region(device_number, master_count);
 out_return:
+#endif
     return ret;
 }
 
@@ -189,10 +193,12 @@ void __exit ec_cleanup_module(void)
     if (master_count)
         kfree(masters);
     
+#ifndef EC_MASTER_IN_USERSPACE
     class_destroy(class);
     
     if (master_count)
         unregister_chrdev_region(device_number, master_count);
+#endif
     
     EC_INFO("Master module cleaned up.\n");
 }
@@ -664,3 +670,54 @@ EXPORT_SYMBOL(ecrt_version_magic);
 /** \endcond */
 
 /*****************************************************************************/
+
+#ifdef EC_MASTER_IN_USERSPACE
+
+int __init ec_gen_init_module(void);
+void __exit ec_gen_cleanup_module(void);
+
+int ecrt_init(unsigned int master_count_, const char *const *master_macs,
+              unsigned int backup_count_, const char *const *backup_macs,
+              unsigned int debug_level_)
+{
+    int i, r;
+
+    if (!master_count_) {
+        EC_ERR("No masters defined.\n");
+        return -EINVAL;
+    }
+    if (master_count_ > MAX_MASTERS) {
+        EC_ERR("Too many masters (max. %i).\n", MAX_MASTERS);
+        return -EINVAL;
+    }
+    if (backup_count_ > master_count_) {
+        EC_ERR("Too many backups (more than masters).\n");
+        return -EINVAL;
+    }
+
+    /* Casting the const away is OK since the targets are use const.
+       They're not declared const only because of module_param_array. */
+    master_count = master_count_;
+    for (i = 0; i < master_count; i++)
+        main_devices[i] = (char *) master_macs[i];
+    backup_count = backup_count_;
+    for (i = 0; i < backup_count; i++)
+        backup_devices[i] = (char *) backup_macs[i];
+    debug_level = debug_level_;
+
+    r = ec_init_module();
+    if (r)
+        return r;
+    r = ec_gen_init_module();
+    if (r)
+        ec_cleanup_module();
+    return r;
+}
+
+void ecrt_done(void)
+{
+    ec_gen_cleanup_module();
+    ec_cleanup_module();
+}
+
+#endif
