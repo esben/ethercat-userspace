@@ -35,7 +35,6 @@
 
 // RTAI
 #include <rtai_sched.h>
-#include <rtai_sem.h>
 
 // EtherCAT
 #include "../../include/ecrt.h"
@@ -64,7 +63,8 @@ static ec_domain_state_t domain1_state = {};
 
 // RTAI
 static RT_TASK task;
-static SEM master_sem;
+static RTIME requested_ticks;
+static atomic_t master_locked = ATOMIC_INIT(0);
 static volatile int cyclic_task_stopped = 0;
 static volatile cycles_t t_last_cycle = 0;
 static cycles_t t_critical;
@@ -122,7 +122,7 @@ static ec_sync_info_t el2008_syncs[] = {
 
 /*****************************************************************************/
 
-// Caller must hold master_sem
+// Caller must have locked master
 void check_domain1_state(void)
 {
     ec_domain_state_t ds;
@@ -138,7 +138,7 @@ void check_domain1_state(void)
 
 /*****************************************************************************/
 
-// Caller must hold master_sem
+// Caller must have locked master
 void check_master_state(void)
 {
     ec_master_state_t ms;
@@ -156,6 +156,21 @@ void check_master_state(void)
 
 /*****************************************************************************/
 
+static int lock_master(void)
+{
+    if (atomic_inc_return(&master_locked) == 1)
+        return 1;
+    atomic_dec(&master_locked);
+    return 0;
+}
+
+static void unlock_master(void)
+{
+    atomic_dec(&master_locked);
+}
+
+/*****************************************************************************/
+
 void run(long data)
 {
     int i;
@@ -166,7 +181,11 @@ void run(long data)
 
     while (1) {
         // receive process data
-        rt_sem_wait(&master_sem);
+        while (!lock_master()) {
+            // should not happen if t_critical is correct
+            printk(KERN_ERR PFX "*** Cyclic task delayed by lock\n");
+            rt_sleep(requested_ticks / 0x10);
+        }
         // disable the debug interface which is not RTAI-safe
         ec_debug_disable(1);
         ecrt_master_receive(master);
@@ -227,7 +246,7 @@ void run(long data)
         ecrt_master_send(master);
         // re-enable the debug interface
         ec_debug_disable(0);
-        rt_sem_signal(&master_sem);
+        unlock_master();
 
         t_last_cycle = get_cycles();
         rt_task_wait_period();
@@ -239,16 +258,16 @@ void run(long data)
 void request_lock_callback(void *cb_data)
 {
     // too close to the next real time cycle: wait ...
-    while (!cyclic_task_stopped && get_cycles() - t_last_cycle > t_critical)
+    while ((!cyclic_task_stopped && get_cycles() - t_last_cycle > t_critical)
+           || !lock_master ())
         schedule();
-    rt_sem_wait(&master_sem);
 }
 
 /*****************************************************************************/
 
 void release_lock_callback(void *cb_data)
 {
-    rt_sem_signal(&master_sem);
+    unlock_master();
 }
 
 /*****************************************************************************/
@@ -256,12 +275,10 @@ void release_lock_callback(void *cb_data)
 int __init init_mod(void)
 {
     int ret = -1, i;
-    RTIME tick_period, requested_ticks, now;
+    RTIME tick_period, now;
     ec_slave_config_t *sc;
 
     printk(KERN_INFO PFX "Starting...\n");
-
-    rt_sem_init(&master_sem, 1);
 
     t_critical = cpu_khz * 1000 / FREQUENCY - cpu_khz * INHIBIT_TIME / 1000;
 
@@ -361,7 +378,6 @@ int __init init_mod(void)
     printk(KERN_ERR PFX "Releasing master...\n");
     ecrt_release_master(master);
  out_return:
-    rt_sem_delete(&master_sem);
     printk(KERN_ERR PFX "Failed to load. Aborting.\n");
     return ret;
 }
@@ -378,7 +394,6 @@ void __exit cleanup_mod(void)
     // re-enable the debug interface in case the task was deleted while it was disabled
     ec_debug_disable(0);
     ecrt_release_master(master);
-    rt_sem_delete(&master_sem);
 
     printk(KERN_INFO PFX "Unloading.\n");
 }
