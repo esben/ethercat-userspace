@@ -83,7 +83,7 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
     if (!domain->process_data) {
         int offset = 0;
 
-        offset = ioctl(domain->master->fd, EC_IOCTL_DOMAIN_OFFSET,
+        offset = ioctl_value(domain->master->fd, EC_IOCTL_DOMAIN_OFFSET,
                 domain->index);
         if (offset == -1) {
             fprintf(stderr, "Failed to get domain offset: %s\n",
@@ -101,7 +101,7 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
 
 void ecrt_domain_process(ec_domain_t *domain)
 {
-    if (ioctl(domain->master->fd, EC_IOCTL_DOMAIN_PROCESS,
+    if (ioctl_value(domain->master->fd, EC_IOCTL_DOMAIN_PROCESS,
                 domain->index) == -1) {
         fprintf(stderr, "Failed to process domain: %s\n", strerror(errno));
     }
@@ -111,7 +111,7 @@ void ecrt_domain_process(ec_domain_t *domain)
 
 void ecrt_domain_queue(ec_domain_t *domain)
 {
-    if (ioctl(domain->master->fd, EC_IOCTL_DOMAIN_QUEUE,
+    if (ioctl_value(domain->master->fd, EC_IOCTL_DOMAIN_QUEUE,
                 domain->index) == -1) {
         fprintf(stderr, "Failed to queue domain: %s\n", strerror(errno));
     }
@@ -126,7 +126,7 @@ void ecrt_domain_state(const ec_domain_t *domain, ec_domain_state_t *state)
     data.domain_index = domain->index;
     data.state = state;
     
-    if (ioctl(domain->master->fd, EC_IOCTL_DOMAIN_STATE, &data) == -1) {
+    if (ioctl_typed(domain->master->fd, EC_IOCTL_DOMAIN_STATE, &data) == -1) {
         fprintf(stderr, "Failed to get domain state: %s\n",
                 strerror(errno));
     }

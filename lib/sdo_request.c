@@ -64,7 +64,7 @@ void ecrt_sdo_request_timeout(ec_sdo_request_t *req, uint32_t timeout)
     data.request_index = req->index;
     data.timeout = timeout;
 
-    if (ioctl(req->config->master->fd, EC_IOCTL_SDO_REQUEST_TIMEOUT,
+    if (ioctl_typed(req->config->master->fd, EC_IOCTL_SDO_REQUEST_TIMEOUT,
                 &data) == -1)
         fprintf(stderr, "Failed to set SDO request timeout: %s\n",
                 strerror(errno));
@@ -93,7 +93,7 @@ ec_request_state_t ecrt_sdo_request_state(ec_sdo_request_t *req)
     data.config_index = req->config->index;
     data.request_index = req->index;
 
-    if (ioctl(req->config->master->fd, EC_IOCTL_SDO_REQUEST_STATE,
+    if (ioctl_typed(req->config->master->fd, EC_IOCTL_SDO_REQUEST_STATE,
                 &data) == -1)
         fprintf(stderr, "Failed to get SDO request state: %s\n",
                 strerror(errno));
@@ -114,7 +114,7 @@ ec_request_state_t ecrt_sdo_request_state(ec_sdo_request_t *req)
 
         data.data = req->data;
 
-        if (ioctl(req->config->master->fd, EC_IOCTL_SDO_REQUEST_DATA,
+        if (ioctl_typed(req->config->master->fd, EC_IOCTL_SDO_REQUEST_DATA,
                     &data) == -1) {
             fprintf(stderr, "Failed to get SDO data: %s\n", strerror(errno));
             return EC_REQUEST_ERROR;
@@ -134,7 +134,7 @@ void ecrt_sdo_request_read(ec_sdo_request_t *req)
     data.config_index = req->config->index;
     data.request_index = req->index;
 
-    if (ioctl(req->config->master->fd, EC_IOCTL_SDO_REQUEST_READ,
+    if (ioctl_typed(req->config->master->fd, EC_IOCTL_SDO_REQUEST_READ,
                 &data) == -1)
         fprintf(stderr, "Failed to command an SDO read operation : %s\n",
                 strerror(errno));
@@ -151,7 +151,7 @@ void ecrt_sdo_request_write(ec_sdo_request_t *req)
     data.data = req->data;
     data.size = req->data_size;
 
-    if (ioctl(req->config->master->fd, EC_IOCTL_SDO_REQUEST_WRITE,
+    if (ioctl_typed(req->config->master->fd, EC_IOCTL_SDO_REQUEST_WRITE,
                 &data) == -1)
         fprintf(stderr, "Failed to command an SDO write operation : %s\n",
                 strerror(errno));

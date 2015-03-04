@@ -669,4 +669,8 @@ typedef struct {
 
 /** \endcond */
 
+#define ioctl_noarg(FD, CMD)        (ioctl((FD), (CMD), NULL))
+#define ioctl_value(FD, CMD, VALUE) (ioctl((FD), (CMD), (VALUE)))
+#define ioctl_typed(FD, CMD, DATA)  (ioctl((FD), (CMD), (DATA)))
+
 #endif

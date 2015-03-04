@@ -65,7 +65,7 @@ void ecrt_voe_handler_send_header(ec_voe_handler_t *voe, uint32_t vendor_id,
     data.vendor_id = &vendor_id;
     data.vendor_type = &vendor_type;
 
-    if (ioctl(voe->config->master->fd, EC_IOCTL_VOE_SEND_HEADER, &data) == -1)
+    if (ioctl_typed(voe->config->master->fd, EC_IOCTL_VOE_SEND_HEADER, &data) == -1)
         fprintf(stderr, "Failed to set VoE send header: %s\n",
                 strerror(errno));
 }
@@ -82,7 +82,7 @@ void ecrt_voe_handler_received_header(const ec_voe_handler_t *voe,
     data.vendor_id = vendor_id;
     data.vendor_type = vendor_type;
 
-    if (ioctl(voe->config->master->fd, EC_IOCTL_VOE_REC_HEADER, &data) == -1)
+    if (ioctl_typed(voe->config->master->fd, EC_IOCTL_VOE_REC_HEADER, &data) == -1)
         fprintf(stderr, "Failed to get received VoE header: %s\n",
                 strerror(errno));
 }
@@ -110,7 +110,7 @@ void ecrt_voe_handler_read(ec_voe_handler_t *voe)
     data.config_index = voe->config->index;
     data.voe_index = voe->index;
 
-    if (ioctl(voe->config->master->fd, EC_IOCTL_VOE_READ, &data) == -1)
+    if (ioctl_typed(voe->config->master->fd, EC_IOCTL_VOE_READ, &data) == -1)
         fprintf(stderr, "Failed to initiate VoE reading: %s\n",
                 strerror(errno));
 }
@@ -124,7 +124,7 @@ void ecrt_voe_handler_read_nosync(ec_voe_handler_t *voe)
     data.config_index = voe->config->index;
     data.voe_index = voe->index;
 
-    if (ioctl(voe->config->master->fd, EC_IOCTL_VOE_READ_NOSYNC, &data) == -1)
+    if (ioctl_typed(voe->config->master->fd, EC_IOCTL_VOE_READ_NOSYNC, &data) == -1)
         fprintf(stderr, "Failed to initiate VoE reading: %s\n",
                 strerror(errno));
 }
@@ -140,7 +140,7 @@ void ecrt_voe_handler_write(ec_voe_handler_t *voe, size_t size)
     data.size = size;
     data.data = voe->data;
 
-    if (ioctl(voe->config->master->fd, EC_IOCTL_VOE_WRITE, &data) == -1)
+    if (ioctl_typed(voe->config->master->fd, EC_IOCTL_VOE_WRITE, &data) == -1)
         fprintf(stderr, "Failed to initiate VoE writing: %s\n",
                 strerror(errno));
 }
@@ -154,7 +154,7 @@ ec_request_state_t ecrt_voe_handler_execute(ec_voe_handler_t *voe)
     data.config_index = voe->config->index;
     data.voe_index = voe->index;
 
-    if (ioctl(voe->config->master->fd, EC_IOCTL_VOE_EXEC, &data) == -1) {
+    if (ioctl_typed(voe->config->master->fd, EC_IOCTL_VOE_EXEC, &data) == -1) {
         fprintf(stderr, "Failed to execute VoE handler: %s\n",
                 strerror(errno));
         return EC_REQUEST_ERROR;
@@ -175,7 +175,7 @@ ec_request_state_t ecrt_voe_handler_execute(ec_voe_handler_t *voe)
 
         data.data = voe->data;
 
-        if (ioctl(voe->config->master->fd, EC_IOCTL_VOE_DATA, &data) == -1) {
+        if (ioctl_typed(voe->config->master->fd, EC_IOCTL_VOE_DATA, &data) == -1) {
             fprintf(stderr, "Failed to get VoE data: %s\n", strerror(errno));
             return EC_REQUEST_ERROR;
         }

@@ -107,7 +107,7 @@ void MasterDevice::close()
 
 void MasterDevice::getModule(ec_ioctl_module_t *data)
 {
-    if (ioctl(fd, EC_IOCTL_MODULE, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_MODULE, data) < 0) {
         stringstream err;
         err << "Failed to get module information: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -118,7 +118,7 @@ void MasterDevice::getModule(ec_ioctl_module_t *data)
 
 void MasterDevice::getMaster(ec_ioctl_master_t *data)
 {
-    if (ioctl(fd, EC_IOCTL_MASTER, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_MASTER, data) < 0) {
         stringstream err;
         err << "Failed to get master information: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -131,7 +131,7 @@ void MasterDevice::getConfig(ec_ioctl_config_t *data, unsigned int index)
 {
     data->config_index = index;
 
-    if (ioctl(fd, EC_IOCTL_CONFIG, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_CONFIG, data) < 0) {
         stringstream err;
         err << "Failed to get slave configuration: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -151,7 +151,7 @@ void MasterDevice::getConfigPdo(
     data->sync_index = sync_index;
     data->pdo_pos = pdo_pos;
 
-    if (ioctl(fd, EC_IOCTL_CONFIG_PDO, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_CONFIG_PDO, data) < 0) {
         stringstream err;
         err << "Failed to get slave config PDO: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -173,7 +173,7 @@ void MasterDevice::getConfigPdoEntry(
     data->pdo_pos = pdo_pos;
     data->entry_pos = entry_pos;
 
-    if (ioctl(fd, EC_IOCTL_CONFIG_PDO_ENTRY, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_CONFIG_PDO_ENTRY, data) < 0) {
         stringstream err;
         err << "Failed to get slave config PDO entry: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -191,7 +191,7 @@ void MasterDevice::getConfigSdo(
     data->config_index = index;
     data->sdo_pos = sdo_pos;
 
-    if (ioctl(fd, EC_IOCTL_CONFIG_SDO, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_CONFIG_SDO, data) < 0) {
         stringstream err;
         err << "Failed to get slave config SDO: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -209,7 +209,7 @@ void MasterDevice::getConfigIdn(
     data->config_index = index;
     data->idn_pos = pos;
 
-    if (ioctl(fd, EC_IOCTL_CONFIG_IDN, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_CONFIG_IDN, data) < 0) {
         stringstream err;
         err << "Failed to get slave config IDN: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -222,7 +222,7 @@ void MasterDevice::getDomain(ec_ioctl_domain_t *data, unsigned int index)
 {
     data->index = index;
 
-    if (ioctl(fd, EC_IOCTL_DOMAIN, data)) {
+    if (ioctl_typed(fd, EC_IOCTL_DOMAIN, data)) {
         stringstream err;
         err << "Failed to get domain: ";
         if (errno == EINVAL)
@@ -242,7 +242,7 @@ void MasterDevice::getData(ec_ioctl_domain_data_t *data,
     data->data_size = dataSize;
     data->target = mem;
 
-    if (ioctl(fd, EC_IOCTL_DOMAIN_DATA, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_DOMAIN_DATA, data) < 0) {
         stringstream err;
         err << "Failed to get domain data: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -255,7 +255,7 @@ void MasterDevice::getSlave(ec_ioctl_slave_t *slave, uint16_t slaveIndex)
 {
     slave->position = slaveIndex;
 
-    if (ioctl(fd, EC_IOCTL_SLAVE, slave)) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE, slave)) {
         stringstream err;
         err << "Failed to get slave: ";
         if (errno == EINVAL)
@@ -277,7 +277,7 @@ void MasterDevice::getFmmu(
     fmmu->domain_index = domainIndex;
     fmmu->fmmu_index = fmmuIndex;
 
-    if (ioctl(fd, EC_IOCTL_DOMAIN_FMMU, fmmu)) {
+    if (ioctl_typed(fd, EC_IOCTL_DOMAIN_FMMU, fmmu)) {
         stringstream err;
         err << "Failed to get domain FMMU: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -295,7 +295,7 @@ void MasterDevice::getSync(
     sync->slave_position = slaveIndex;
     sync->sync_index = syncIndex;
 
-    if (ioctl(fd, EC_IOCTL_SLAVE_SYNC, sync)) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SYNC, sync)) {
         stringstream err;
         err << "Failed to get sync manager: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -315,7 +315,7 @@ void MasterDevice::getPdo(
     pdo->sync_index = syncIndex;
     pdo->pdo_pos = pdoPos;
 
-    if (ioctl(fd, EC_IOCTL_SLAVE_SYNC_PDO, pdo)) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SYNC_PDO, pdo)) {
         stringstream err;
         err << "Failed to get PDO: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -337,7 +337,7 @@ void MasterDevice::getPdoEntry(
     entry->pdo_pos = pdoPos;
     entry->entry_pos = entryPos;
 
-    if (ioctl(fd, EC_IOCTL_SLAVE_SYNC_PDO_ENTRY, entry)) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SYNC_PDO_ENTRY, entry)) {
         stringstream err;
         err << "Failed to get PDO entry: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -355,7 +355,7 @@ void MasterDevice::getSdo(
     sdo->slave_position = slaveIndex;
     sdo->sdo_position = sdoPosition;
 
-    if (ioctl(fd, EC_IOCTL_SLAVE_SDO, sdo)) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SDO, sdo)) {
         stringstream err;
         err << "Failed to get SDO: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -375,7 +375,7 @@ void MasterDevice::getSdoEntry(
     entry->sdo_spec = sdoSpec;
     entry->sdo_entry_subindex = entrySubindex;
 
-    if (ioctl(fd, EC_IOCTL_SLAVE_SDO_ENTRY, entry)) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SDO_ENTRY, entry)) {
         stringstream err;
         err << "Failed to get SDO entry: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -388,7 +388,7 @@ void MasterDevice::readSii(
         ec_ioctl_slave_sii_t *data
         )
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_SII_READ, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SII_READ, data) < 0) {
         stringstream err;
         err << "Failed to read SII: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -401,7 +401,7 @@ void MasterDevice::writeSii(
         ec_ioctl_slave_sii_t *data
         )
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_SII_WRITE, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SII_WRITE, data) < 0) {
         stringstream err;
         err << "Failed to write SII: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -414,7 +414,7 @@ void MasterDevice::readReg(
         ec_ioctl_slave_reg_t *data
         )
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_REG_READ, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_REG_READ, data) < 0) {
         stringstream err;
         err << "Failed to read register: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -427,7 +427,7 @@ void MasterDevice::writeReg(
         ec_ioctl_slave_reg_t *data
         )
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_REG_WRITE, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_REG_WRITE, data) < 0) {
         stringstream err;
         err << "Failed to write register: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -440,7 +440,7 @@ void MasterDevice::readFoe(
         ec_ioctl_slave_foe_t *data
         )
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_FOE_READ, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_FOE_READ, data) < 0) {
         stringstream err;
         err << "Failed to read via FoE: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -453,7 +453,7 @@ void MasterDevice::writeFoe(
         ec_ioctl_slave_foe_t *data
         )
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_FOE_WRITE, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_FOE_WRITE, data) < 0) {
         stringstream err;
         err << "Failed to write via FoE: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -464,7 +464,7 @@ void MasterDevice::writeFoe(
 
 void MasterDevice::setDebug(unsigned int debugLevel)
 {
-    if (ioctl(fd, EC_IOCTL_MASTER_DEBUG, debugLevel) < 0) {
+    if (ioctl_value(fd, EC_IOCTL_MASTER_DEBUG, debugLevel) < 0) {
         stringstream err;
         err << "Failed to set debug level: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -475,7 +475,7 @@ void MasterDevice::setDebug(unsigned int debugLevel)
 
 void MasterDevice::rescan()
 {
-    if (ioctl(fd, EC_IOCTL_MASTER_RESCAN, 0) < 0) {
+    if (ioctl_noarg(fd, EC_IOCTL_MASTER_RESCAN) < 0) {
         stringstream err;
         err << "Failed to command rescan: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -486,7 +486,7 @@ void MasterDevice::rescan()
 
 void MasterDevice::sdoDownload(ec_ioctl_slave_sdo_download_t *data)
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_SDO_DOWNLOAD, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SDO_DOWNLOAD, data) < 0) {
         stringstream err;
         if (errno == EIO && data->abort_code) {
             throw MasterDeviceSdoAbortException(data->abort_code);
@@ -501,7 +501,7 @@ void MasterDevice::sdoDownload(ec_ioctl_slave_sdo_download_t *data)
 
 void MasterDevice::sdoUpload(ec_ioctl_slave_sdo_upload_t *data)
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_SDO_UPLOAD, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SDO_UPLOAD, data) < 0) {
         stringstream err;
         if (errno == EIO && data->abort_code) {
             throw MasterDeviceSdoAbortException(data->abort_code);
@@ -524,7 +524,7 @@ void MasterDevice::requestState(
     data.slave_position = slavePosition;
     data.al_state = state;
     
-    if (ioctl(fd, EC_IOCTL_SLAVE_STATE, &data)) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_STATE, &data)) {
         stringstream err;
         err << "Failed to request slave state: ";
         if (errno == EINVAL)
@@ -546,7 +546,7 @@ void MasterDevice::getEoeHandler(
 {
     eoe->eoe_index = eoeHandlerIndex;
 
-    if (ioctl(fd, EC_IOCTL_EOE_HANDLER, eoe)) {
+    if (ioctl_typed(fd, EC_IOCTL_EOE_HANDLER, eoe)) {
         stringstream err;
         err << "Failed to get EoE handler: " << strerror(errno);
         throw MasterDeviceException(err);
@@ -559,7 +559,7 @@ void MasterDevice::getEoeHandler(
 
 void MasterDevice::readSoe(ec_ioctl_slave_soe_read_t *data)
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_SOE_READ, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SOE_READ, data) < 0) {
         if (errno == EIO && data->error_code) {
             throw MasterDeviceSoeException(data->error_code);
         } else {
@@ -574,7 +574,7 @@ void MasterDevice::readSoe(ec_ioctl_slave_soe_read_t *data)
 
 void MasterDevice::writeSoe(ec_ioctl_slave_soe_write_t *data)
 {
-    if (ioctl(fd, EC_IOCTL_SLAVE_SOE_WRITE, data) < 0) {
+    if (ioctl_typed(fd, EC_IOCTL_SLAVE_SOE_WRITE, data) < 0) {
         if (errno == EIO && data->error_code) {
             throw MasterDeviceSoeException(data->error_code);
         } else {

@@ -95,7 +95,7 @@ ec_master_t *ecrt_open_master(unsigned int master_index)
         goto out_clear;
     }
 
-    if (ioctl(master->fd, EC_IOCTL_MODULE, &module_data) < 0) {
+    if (ioctl_typed(master->fd, EC_IOCTL_MODULE, &module_data) < 0) {
         fprintf(stderr, "Failed to get module information from %s: %s\n",
                 path, strerror(errno));
         goto out_clear;
