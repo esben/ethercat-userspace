@@ -892,6 +892,15 @@ static int is_zero(const uint8_t *p, size_t n)
     return 1;
 }
 
+static int index_in_use(ec_master_t *master, uint8_t index)
+{
+    ec_datagram_t *datagram;
+    list_for_each_entry(datagram, &master->datagram_queue, queue)
+        if (datagram->state == EC_DATAGRAM_SENT && datagram->index == index)
+            return 1;
+    return 0;
+}
+
 static int ec_slave_datagram_to_buffer(
         ec_slave_t *slave,
         uint8_t protocol,
@@ -969,6 +978,7 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
         list_for_each_entry_safe(datagram, next, &master->datagram_queue, queue) {
             ec_slave_t *mbox_slave;
             uint8_t mbox_prot;
+            uint8_t last_index;
 
             if (datagram->state != EC_DATAGRAM_QUEUED) continue;
 
@@ -1031,8 +1041,17 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
                 break;
             }
 
-            list_add_tail(&datagram->sent, &sent_datagrams);
+            // do not reuse the index of a pending datagram to avoid confusion
+            // in ec_master_receive_datagrams()
+            last_index = master->datagram_index;
+            while (index_in_use(master, master->datagram_index))
+                if (++master->datagram_index == last_index) {
+                    EC_MASTER_ERR(master, "No free datagram index, sending delayed\n");
+                    goto break_send;
+                }
             datagram->index = master->datagram_index++;
+
+            list_add_tail(&datagram->sent, &sent_datagrams);
 
             EC_MASTER_DBG(master, 2, "adding datagram 0x%02X\n",
                     datagram->index);
@@ -1058,6 +1077,7 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
             EC_WRITE_U16(cur_data, 0x0000); // reset working counter
             cur_data += EC_DATAGRAM_FOOTER_SIZE;
         }
+break_send:
 
         if (list_empty(&sent_datagrams)) {
             EC_MASTER_DBG(master, 2, "nothing to send.\n");
