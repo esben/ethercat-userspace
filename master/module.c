@@ -523,6 +523,11 @@ ec_master_t *ecrt_request_master_err(
         goto out_return;
     }
     master = &masters[master_index];
+    if (!master->main_device.dev) {
+        EC_MASTER_ERR(master,"Master has no device attached.\n");
+        errptr = ERR_PTR(-EINVAL);
+        goto out_return;
+    }
 
     if (down_interruptible(&master_sem)) {
         errptr = ERR_PTR(-EINTR);
