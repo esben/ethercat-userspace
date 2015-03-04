@@ -46,6 +46,10 @@
 
 /*****************************************************************************/
 
+/** EoE mailbox type.
+ */
+#define EC_MBOX_TYPE_EOE 0x02
+
 /** Defines the debug level of EoE processing.
  *
  * 0 = No debug messages.
@@ -295,7 +299,7 @@ int ec_eoe_send(ec_eoe_t *eoe /**< EoE handler */)
 #endif
 
     data = ec_slave_mbox_prepare_send(eoe->slave, &eoe->datagram,
-            0x02, current_size + 4);
+            EC_MBOX_TYPE_EOE, current_size + 4);
     if (IS_ERR(data))
         return PTR_ERR(data);
 
@@ -394,7 +398,7 @@ void ec_eoe_state_rx_start(ec_eoe_t *eoe /**< EoE handler */)
         return;
     }
 
-    ec_slave_mbox_prepare_check(eoe->slave, &eoe->datagram);
+    ec_slave_mbox_prepare_check(eoe->slave, &eoe->datagram, EC_MBOX_TYPE_EOE);
     eoe->queue_datagram = 1;
     eoe->state = ec_eoe_state_rx_check;
 }
@@ -425,7 +429,7 @@ void ec_eoe_state_rx_check(ec_eoe_t *eoe /**< EoE handler */)
     }
 
     eoe->rx_idle = 0;
-    ec_slave_mbox_prepare_fetch(eoe->slave, &eoe->datagram);
+    ec_slave_mbox_prepare_fetch(eoe->slave, &eoe->datagram, EC_MBOX_TYPE_EOE);
     eoe->queue_datagram = 1;
     eoe->state = ec_eoe_state_rx_fetch;
 }
@@ -472,7 +476,7 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
         return;
     }
 
-    if (mbox_prot != 0x02) { // EoE FIXME mailbox handler necessary
+    if (mbox_prot != EC_MBOX_TYPE_EOE) {
         eoe->stats.rx_errors++;
 #if EOE_DEBUG_LEVEL >= 1
         EC_SLAVE_WARN(eoe->slave, "Other mailbox protocol response for %s.\n",

@@ -49,7 +49,11 @@
         return ret; \
     datagram->index = 0; \
     datagram->working_counter = 0; \
-    datagram->state = EC_DATAGRAM_INIT;
+    datagram->state = EC_DATAGRAM_INIT; \
+    datagram->mailbox_send_retries = 0; \
+    datagram->mailbox_datagram_type = EC_DATAGRAM_MAILBOX_NONE; \
+    datagram->mailbox_slave = NULL; \
+    datagram->mailbox_protocol = EC_MBOX_NO_PROTOCOL;
 
 #define EC_FUNC_FOOTER \
     datagram->data_size = data_size; \
@@ -108,6 +112,10 @@ void ec_datagram_init(ec_datagram_t *datagram /**< EtherCAT datagram. */)
     datagram->skip_count = 0;
     datagram->stats_output_jiffies = 0;
     memset(datagram->name, 0x00, EC_DATAGRAM_NAME_SIZE);
+    datagram->mailbox_send_retries = 0;
+    datagram->mailbox_datagram_type = EC_DATAGRAM_MAILBOX_NONE;
+    datagram->mailbox_slave = NULL;
+    datagram->mailbox_protocol = EC_MBOX_NO_PROTOCOL;
 }
 
 /*****************************************************************************/

@@ -304,7 +304,7 @@ void ec_voe_handler_state_read_start(ec_voe_handler_t *voe)
         return;
     }
 
-    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_VOE); // can not fail.
 
     voe->jiffies_start = jiffies;
     voe->retries = EC_FSM_RETRIES;
@@ -350,13 +350,13 @@ void ec_voe_handler_state_read_check(ec_voe_handler_t *voe)
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_VOE); // can not fail.
         voe->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_VOE); // can not fail.
     voe->retries = EC_FSM_RETRIES;
     voe->state = ec_voe_handler_state_read_response;
 }
@@ -444,7 +444,7 @@ void ec_voe_handler_state_read_nosync_start(ec_voe_handler_t *voe)
         return;
     }
 
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_VOE); // can not fail.
 
     voe->jiffies_start = jiffies;
     voe->retries = EC_FSM_RETRIES;

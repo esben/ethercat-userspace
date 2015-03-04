@@ -273,7 +273,7 @@ void ec_fsm_soe_read_request(ec_fsm_soe_t *fsm /**< finite state machine */)
     }
 
     fsm->jiffies_start = datagram->jiffies_sent;
-    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_SOE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_soe_read_check;
 }
@@ -318,13 +318,13 @@ void ec_fsm_soe_read_check(ec_fsm_soe_t *fsm /**< finite state machine */)
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_SOE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_SOE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_soe_read_response;
 }
@@ -436,7 +436,7 @@ void ec_fsm_soe_read_response(ec_fsm_soe_t *fsm /**< finite state machine */)
         EC_SLAVE_DBG(slave, 1, "SoE data incomplete. Waiting for fragment"
                 " at offset %zu.\n", req->data_size);
         fsm->jiffies_start = datagram->jiffies_sent;
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_SOE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_soe_read_check;
     } else {
@@ -573,7 +573,7 @@ void ec_fsm_soe_write_request(ec_fsm_soe_t *fsm /**< finite state machine */)
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_SOE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_soe_write_check;
 }
@@ -621,13 +621,13 @@ void ec_fsm_soe_write_check(ec_fsm_soe_t *fsm /**< finite state machine */)
                 return;
             }
 
-            ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+            ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_SOE); // can not fail.
             fsm->retries = EC_FSM_RETRIES;
             return;
         }
 
         // Fetch response
-        ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_SOE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_soe_write_response;
     }

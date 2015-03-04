@@ -45,6 +45,10 @@
  */
 #define EC_FSM_COE_DICT_TIMEOUT 1000
 
+/** CoE mailbox type.
+ */
+#define EC_MBOX_TYPE_COE 0x03
+
 /** CoE download request header size.
  */
 #define EC_COE_DOWN_REQ_HEADER_SIZE 10
@@ -303,7 +307,7 @@ void ec_fsm_coe_dict_start(ec_fsm_coe_t *fsm /**< finite state machine */)
         return;
     }
 
-    data = ec_slave_mbox_prepare_send(slave, datagram, 0x03, 8);
+    data = ec_slave_mbox_prepare_send(slave, datagram, EC_MBOX_TYPE_COE, 8);
     if (IS_ERR(data)) {
         fsm->state = ec_fsm_coe_error;
         return;
@@ -351,7 +355,7 @@ void ec_fsm_coe_dict_request(ec_fsm_coe_t *fsm /**< finite state machine */)
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_dict_check;
 }
@@ -395,13 +399,13 @@ void ec_fsm_coe_dict_check(ec_fsm_coe_t *fsm /**< finite state machine */)
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_dict_response;
 }
@@ -449,7 +453,7 @@ void ec_fsm_coe_dict_response(ec_fsm_coe_t *fsm /**< finite state machine */)
         return;
     }
 
-    if (mbox_prot != 0x03) { // CoE
+    if (mbox_prot != EC_MBOX_TYPE_COE) {
         EC_SLAVE_ERR(slave, "Received mailbox protocol 0x%02X as response.\n",
                 mbox_prot);
         fsm->state = ec_fsm_coe_error;
@@ -458,7 +462,7 @@ void ec_fsm_coe_dict_response(ec_fsm_coe_t *fsm /**< finite state machine */)
 
     if (ec_fsm_coe_check_emergency(fsm, data, rec_size)) {
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_dict_check;
         return;
@@ -492,7 +496,7 @@ void ec_fsm_coe_dict_response(ec_fsm_coe_t *fsm /**< finite state machine */)
                     " Retrying...\n");
             ec_print_data(data, rec_size);
         }
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_dict_check;
         return;
@@ -536,7 +540,7 @@ void ec_fsm_coe_dict_response(ec_fsm_coe_t *fsm /**< finite state machine */)
     if (EC_READ_U8(data + 2) & 0x80 || fragments_left) {
         // more messages waiting. check again.
         fsm->jiffies_start = datagram->jiffies_sent;
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_dict_check;
         return;
@@ -551,7 +555,7 @@ void ec_fsm_coe_dict_response(ec_fsm_coe_t *fsm /**< finite state machine */)
     // fetch SDO descriptions
     fsm->sdo = list_entry(slave->sdo_dictionary.next, ec_sdo_t, list);
 
-    data = ec_slave_mbox_prepare_send(slave, datagram, 0x03, 8);
+    data = ec_slave_mbox_prepare_send(slave, datagram, EC_MBOX_TYPE_COE, 8);
     if (IS_ERR(data)) {
         fsm->state = ec_fsm_coe_error;
         return;
@@ -600,7 +604,7 @@ void ec_fsm_coe_dict_desc_request(ec_fsm_coe_t *fsm /**< finite state machine */
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_dict_desc_check;
 }
@@ -645,13 +649,13 @@ void ec_fsm_coe_dict_desc_check(ec_fsm_coe_t *fsm /**< finite state machine */)
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_dict_desc_response;
 }
@@ -697,7 +701,7 @@ void ec_fsm_coe_dict_desc_response(ec_fsm_coe_t *fsm
         return;
     }
 
-    if (mbox_prot != 0x03) { // CoE
+    if (mbox_prot != EC_MBOX_TYPE_COE) {
         EC_SLAVE_ERR(slave, "Received mailbox protocol 0x%02X as response.\n",
                 mbox_prot);
         fsm->state = ec_fsm_coe_error;
@@ -706,7 +710,7 @@ void ec_fsm_coe_dict_desc_response(ec_fsm_coe_t *fsm
 
     if (ec_fsm_coe_check_emergency(fsm, data, rec_size)) {
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_dict_desc_check;
         return;
@@ -744,7 +748,7 @@ void ec_fsm_coe_dict_desc_response(ec_fsm_coe_t *fsm
             ec_print_data(data, rec_size);
         }
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_dict_desc_check;
         return;
@@ -782,7 +786,7 @@ void ec_fsm_coe_dict_desc_response(ec_fsm_coe_t *fsm
 
     fsm->subindex = 0;
 
-    data = ec_slave_mbox_prepare_send(slave, datagram, 0x03, 10);
+    data = ec_slave_mbox_prepare_send(slave, datagram, EC_MBOX_TYPE_COE, 10);
     if (IS_ERR(data)) {
         fsm->state = ec_fsm_coe_error;
         return;
@@ -833,7 +837,7 @@ void ec_fsm_coe_dict_entry_request(ec_fsm_coe_t *fsm
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(slave, datagram); // can not fail
+    ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_dict_entry_check;
 }
@@ -879,13 +883,13 @@ void ec_fsm_coe_dict_entry_check(ec_fsm_coe_t *fsm
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_dict_entry_response;
 }
@@ -933,7 +937,7 @@ void ec_fsm_coe_dict_entry_response(ec_fsm_coe_t *fsm
         return;
     }
 
-    if (mbox_prot != 0x03) { // CoE
+    if (mbox_prot != EC_MBOX_TYPE_COE) {
         EC_SLAVE_ERR(slave, "Received mailbox protocol"
                 " 0x%02X as response.\n", mbox_prot);
         fsm->state = ec_fsm_coe_error;
@@ -942,7 +946,7 @@ void ec_fsm_coe_dict_entry_response(ec_fsm_coe_t *fsm
 
     if (ec_fsm_coe_check_emergency(fsm, data, rec_size)) {
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_dict_entry_check;
         return;
@@ -985,7 +989,7 @@ void ec_fsm_coe_dict_entry_response(ec_fsm_coe_t *fsm
                 ec_print_data(data, rec_size);
             }
             // check for CoE response again
-            ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+            ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
             fsm->retries = EC_FSM_RETRIES;
             fsm->state = ec_fsm_coe_dict_entry_check;
             return;
@@ -1040,7 +1044,7 @@ void ec_fsm_coe_dict_entry_response(ec_fsm_coe_t *fsm
     if (fsm->subindex < sdo->max_subindex) {
         fsm->subindex++;
 
-        data = ec_slave_mbox_prepare_send(slave, datagram, 0x03, 10);
+        data = ec_slave_mbox_prepare_send(slave, datagram, EC_MBOX_TYPE_COE, 10);
         if (IS_ERR(data)) {
             fsm->state = ec_fsm_coe_error;
             return;
@@ -1063,7 +1067,7 @@ void ec_fsm_coe_dict_entry_response(ec_fsm_coe_t *fsm
     if (fsm->sdo->list.next != &slave->sdo_dictionary) {
         fsm->sdo = list_entry(fsm->sdo->list.next, ec_sdo_t, list);
 
-        data = ec_slave_mbox_prepare_send(slave, datagram, 0x03, 8);
+        data = ec_slave_mbox_prepare_send(slave, datagram, EC_MBOX_TYPE_COE, 8);
         if (IS_ERR(data)) {
             fsm->state = ec_fsm_coe_error;
             return;
@@ -1127,7 +1131,7 @@ void ec_fsm_coe_down_start(
     }
 
     if (request->data_size <= 4) { // use expedited transfer type
-        data = ec_slave_mbox_prepare_send(slave, datagram, 0x03,
+        data = ec_slave_mbox_prepare_send(slave, datagram, EC_MBOX_TYPE_COE,
                 EC_COE_DOWN_REQ_HEADER_SIZE);
         if (IS_ERR(data)) {
             request->errno = PTR_ERR(data);
@@ -1169,7 +1173,7 @@ void ec_fsm_coe_down_start(
             data_size = required_data_size;
         }
 
-        data = ec_slave_mbox_prepare_send(slave, datagram, 0x03,
+        data = ec_slave_mbox_prepare_send(slave, datagram, EC_MBOX_TYPE_COE,
                 data_size);
         if (IS_ERR(data)) {
             request->errno = PTR_ERR(data);
@@ -1266,7 +1270,7 @@ void ec_fsm_coe_down_request(ec_fsm_coe_t *fsm /**< finite state machine */)
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_down_check;
 }
@@ -1313,13 +1317,13 @@ void ec_fsm_coe_down_check(ec_fsm_coe_t *fsm /**< finite state machine */)
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_down_response;
 }
@@ -1359,7 +1363,7 @@ void ec_fsm_coe_down_prepare_segment_request(
             + EC_COE_DOWN_SEG_MIN_DATA_SIZE;
     }
 
-    data = ec_slave_mbox_prepare_send(slave, datagram, 0x03,
+    data = ec_slave_mbox_prepare_send(slave, datagram, EC_MBOX_TYPE_COE,
             data_size);
     if (IS_ERR(data)) {
         request->errno = PTR_ERR(data);
@@ -1432,7 +1436,7 @@ void ec_fsm_coe_down_response(ec_fsm_coe_t *fsm /**< finite state machine */)
         return;
     }
 
-    if (mbox_prot != 0x03) { // CoE
+    if (mbox_prot != EC_MBOX_TYPE_COE) {
         request->errno = EIO;
         fsm->state = ec_fsm_coe_error;
         EC_SLAVE_ERR(slave, "Received mailbox protocol 0x%02X as response.\n",
@@ -1442,7 +1446,7 @@ void ec_fsm_coe_down_response(ec_fsm_coe_t *fsm /**< finite state machine */)
 
     if (ec_fsm_coe_check_emergency(fsm, data, rec_size)) {
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_down_check;
         return;
@@ -1494,7 +1498,7 @@ void ec_fsm_coe_down_response(ec_fsm_coe_t *fsm /**< finite state machine */)
             ec_print_data(data, rec_size);
         }
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_down_check;
         return;
@@ -1550,13 +1554,13 @@ void ec_fsm_coe_down_seg_check(ec_fsm_coe_t *fsm /**< finite state machine */)
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_down_seg_response;
 }
@@ -1605,7 +1609,7 @@ void ec_fsm_coe_down_seg_response(
         return;
     }
 
-    if (mbox_prot != 0x03) { // CoE
+    if (mbox_prot != EC_MBOX_TYPE_COE) {
         request->errno = EIO;
         fsm->state = ec_fsm_coe_error;
         EC_SLAVE_ERR(slave, "Received mailbox protocol 0x%02X as response.\n",
@@ -1615,7 +1619,7 @@ void ec_fsm_coe_down_seg_response(
 
     if (ec_fsm_coe_check_emergency(fsm, data, rec_size)) {
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_down_check;
         return;
@@ -1665,7 +1669,7 @@ void ec_fsm_coe_down_seg_response(
             ec_print_data(data, rec_size);
         }
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_down_seg_check;
         return;
@@ -1712,7 +1716,7 @@ void ec_fsm_coe_up_start(ec_fsm_coe_t *fsm /**< finite state machine */)
         return;
     }
 
-    data = ec_slave_mbox_prepare_send(slave, datagram, 0x03, 10);
+    data = ec_slave_mbox_prepare_send(slave, datagram, EC_MBOX_TYPE_COE, 10);
     if (IS_ERR(data)) {
         request->errno = PTR_ERR(data);
         fsm->state = ec_fsm_coe_error;
@@ -1791,7 +1795,7 @@ void ec_fsm_coe_up_request(ec_fsm_coe_t *fsm /**< finite state machine */)
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_up_check;
 }
@@ -1839,13 +1843,13 @@ void ec_fsm_coe_up_check(ec_fsm_coe_t *fsm /**< finite state machine */)
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_up_response;
 }
@@ -1859,7 +1863,7 @@ void ec_fsm_coe_up_prepare_segment_request(
         )
 {
     uint8_t *data =
-        ec_slave_mbox_prepare_send(fsm->slave, fsm->datagram, 0x03, 10);
+        ec_slave_mbox_prepare_send(fsm->slave, fsm->datagram, EC_MBOX_TYPE_COE, 10);
     if (IS_ERR(data)) {
         fsm->request->errno = PTR_ERR(data);
         fsm->state = ec_fsm_coe_error;
@@ -1928,7 +1932,7 @@ void ec_fsm_coe_up_response(ec_fsm_coe_t *fsm /**< finite state machine */)
         ec_print_data(data, rec_size);
     }
 
-    if (mbox_prot != 0x03) { // CoE
+    if (mbox_prot != EC_MBOX_TYPE_COE) {
         request->errno = EIO;
         fsm->state = ec_fsm_coe_error;
         EC_SLAVE_WARN(slave, "Received mailbox protocol 0x%02X"
@@ -1938,7 +1942,7 @@ void ec_fsm_coe_up_response(ec_fsm_coe_t *fsm /**< finite state machine */)
 
     if (ec_fsm_coe_check_emergency(fsm, data, rec_size)) {
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_up_check;
         return;
@@ -1989,7 +1993,7 @@ void ec_fsm_coe_up_response(ec_fsm_coe_t *fsm /**< finite state machine */)
         ec_print_data(data, rec_size);
 
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_up_check;
         return;
@@ -2111,7 +2115,7 @@ void ec_fsm_coe_up_seg_request(ec_fsm_coe_t *fsm /**< finite state machine */)
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_up_seg_check;
 }
@@ -2159,13 +2163,13 @@ void ec_fsm_coe_up_seg_check(ec_fsm_coe_t *fsm /**< finite state machine */)
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_coe_up_seg_response;
 }
@@ -2220,7 +2224,7 @@ void ec_fsm_coe_up_seg_response(ec_fsm_coe_t *fsm /**< finite state machine */)
         ec_print_data(data, rec_size);
     }
 
-    if (mbox_prot != 0x03) { // CoE
+    if (mbox_prot != EC_MBOX_TYPE_COE) {
         EC_SLAVE_ERR(slave, "Received mailbox protocol 0x%02X as response.\n",
                 mbox_prot);
         request->errno = EIO;
@@ -2230,7 +2234,7 @@ void ec_fsm_coe_up_seg_response(ec_fsm_coe_t *fsm /**< finite state machine */)
 
     if (ec_fsm_coe_check_emergency(fsm, data, rec_size)) {
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_up_seg_check;
         return;
@@ -2263,7 +2267,7 @@ void ec_fsm_coe_up_seg_response(ec_fsm_coe_t *fsm /**< finite state machine */)
             ec_print_data(data, rec_size);
         }
         // check for CoE response again
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_COE); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_up_seg_check;
         return;

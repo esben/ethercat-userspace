@@ -47,6 +47,19 @@
 #include "sdo.h"
 #include "fsm_slave.h"
 
+/** Dummy protocol number used for internal mailbox checks,
+    not used in datagrams.
+  */
+#define EC_MBOX_NO_PROTOCOL 0x00
+
+/** Maximum used mailbox protocol number plus 1.
+ */
+#define EC_MBOX_MAX_PROTOCOL 0x10
+
+/** Buffers per protocol.
+ */
+#define EC_MBOX_BUFFERS 0x10
+
 /*****************************************************************************/
 
 /** Convenience macro for printing slave-specific information to syslog.

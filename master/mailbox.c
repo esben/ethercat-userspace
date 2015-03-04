@@ -48,7 +48,7 @@
    \return Pointer to mailbox datagram data, or ERR_PTR() code.
 */
 
-uint8_t *ec_slave_mbox_prepare_send(const ec_slave_t *slave, /**< slave */
+uint8_t *ec_slave_mbox_prepare_send(ec_slave_t *slave, /**< slave */
                                     ec_datagram_t *datagram, /**< datagram */
                                     uint8_t type, /**< mailbox protocol */
                                     size_t size /**< size of the data */
@@ -82,6 +82,11 @@ uint8_t *ec_slave_mbox_prepare_send(const ec_slave_t *slave, /**< slave */
     EC_WRITE_U8 (datagram->data + 4, 0x00); // channel & priority
     EC_WRITE_U8 (datagram->data + 5, type); // underlying protocol type
 
+    datagram->mailbox_send_retries = EC_DATAGRAM_MAILBOX_SEND_RETRIES;
+    datagram->mailbox_datagram_type = EC_DATAGRAM_MAILBOX_SEND;
+    datagram->mailbox_slave = slave;
+    datagram->mailbox_protocol = type;
+
     return datagram->data + EC_MBOX_HEADER_SIZE;
 }
 
@@ -93,8 +98,9 @@ uint8_t *ec_slave_mbox_prepare_send(const ec_slave_t *slave, /**< slave */
    \return 0 in case of success, else < 0
 */
 
-int ec_slave_mbox_prepare_check(const ec_slave_t *slave, /**< slave */
-                                ec_datagram_t *datagram /**< datagram */
+int ec_slave_mbox_prepare_check(ec_slave_t *slave, /**< slave */
+                                ec_datagram_t *datagram, /**< datagram */
+                                uint8_t type /**< mailbox protocol */
                                 )
 {
     int ret = ec_datagram_fprd(datagram, slave->station_address, 0x808, 8);
@@ -102,6 +108,9 @@ int ec_slave_mbox_prepare_check(const ec_slave_t *slave, /**< slave */
         return ret;
 
     ec_datagram_zero(datagram);
+    datagram->mailbox_datagram_type = EC_DATAGRAM_MAILBOX_CHECK;
+    datagram->mailbox_slave = slave;
+    datagram->mailbox_protocol = type;
     return 0;
 }
 
@@ -124,8 +133,9 @@ int ec_slave_mbox_check(const ec_datagram_t *datagram /**< datagram */)
    \return 0 in case of success, else < 0
 */
 
-int ec_slave_mbox_prepare_fetch(const ec_slave_t *slave, /**< slave */
-                                ec_datagram_t *datagram /**< datagram */
+int ec_slave_mbox_prepare_fetch(ec_slave_t *slave, /**< slave */
+                                ec_datagram_t *datagram, /**< datagram */
+                                uint8_t type /**< mailbox protocol */
                                 )
 {
     int ret = ec_datagram_fprd(datagram, slave->station_address,
@@ -135,6 +145,9 @@ int ec_slave_mbox_prepare_fetch(const ec_slave_t *slave, /**< slave */
         return ret;
 
     ec_datagram_zero(datagram);
+    datagram->mailbox_datagram_type = EC_DATAGRAM_MAILBOX_FETCH;
+    datagram->mailbox_slave = slave;
+    datagram->mailbox_protocol = type;
     return 0;
 }
 
@@ -208,3 +221,22 @@ uint8_t *ec_slave_mbox_fetch(const ec_slave_t *slave, /**< slave */
 }
 
 /*****************************************************************************/
+
+int ec_slave_is_mbox_datagram(const ec_datagram_t *datagram, /**< datagram */
+                              ec_datagram_mailbox_datagram_type_t mailbox_datagram_type,
+                              ec_slave_t **slave, /**< slave */
+                              uint8_t *type /**< mailbox protocol */
+                              )
+{
+    *slave = datagram->mailbox_slave;
+    *type = datagram->mailbox_protocol;
+    return datagram->mailbox_slave
+           && datagram->mailbox_datagram_type == mailbox_datagram_type;
+}
+
+void ec_slave_mbox_override_check(ec_datagram_t *datagram, /**< datagram */
+                                  int value) /**< new value */
+{
+    EC_WRITE_U8(datagram->data + 5,
+        (EC_READ_U8(datagram->data + 5) & ~8) | (value ? 8 : 0));
+}

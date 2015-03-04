@@ -340,13 +340,13 @@ void ec_fsm_foe_state_ack_check(
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_FILEACCESS); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_FILEACCESS); // can not fail.
 
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_foe_state_ack_read;
@@ -464,7 +464,7 @@ void ec_fsm_foe_state_wrq_sent(
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(fsm->slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(fsm->slave, datagram, EC_MBOX_TYPE_FILEACCESS); // can not fail.
 
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_foe_state_ack_check;
@@ -502,7 +502,7 @@ void ec_fsm_foe_state_data_sent(
         return;
     }
 
-    ec_slave_mbox_prepare_check(fsm->slave, fsm->datagram);
+    ec_slave_mbox_prepare_check(fsm->slave, fsm->datagram, EC_MBOX_TYPE_FILEACCESS);
     fsm->jiffies_start = jiffies;
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_foe_state_ack_check;
@@ -592,7 +592,7 @@ void ec_fsm_foe_state_rrq_sent(
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(fsm->slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(fsm->slave, datagram, EC_MBOX_TYPE_FILEACCESS); // can not fail.
 
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_foe_state_data_check;
@@ -684,13 +684,13 @@ void ec_fsm_foe_state_data_check(
             return;
         }
 
-        ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
+        ec_slave_mbox_prepare_check(slave, datagram, EC_MBOX_TYPE_FILEACCESS); // can not fail.
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
 
     // Fetch response
-    ec_slave_mbox_prepare_fetch(slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_fetch(slave, datagram, EC_MBOX_TYPE_FILEACCESS); // can not fail.
 
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_foe_state_data_read;
@@ -853,7 +853,7 @@ void ec_fsm_foe_state_sent_ack(
 
     fsm->jiffies_start = datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(fsm->slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(fsm->slave, datagram, EC_MBOX_TYPE_FILEACCESS); // can not fail.
 
     if (fsm->rx_last_packet) {
         fsm->rx_expected_packet_no = 0;

@@ -43,6 +43,9 @@
 
 #include "globals.h"
 
+/** Number of times to retry a mailbox send if the mailbox is not ready. */
+#define EC_DATAGRAM_MAILBOX_SEND_RETRIES 0x10
+
 /*****************************************************************************/
 
 /** EtherCAT datagram type.
@@ -82,6 +85,17 @@ typedef enum {
 
 /*****************************************************************************/
 
+/** EtherCAT mailbox type.
+ */
+typedef enum {
+    EC_DATAGRAM_MAILBOX_NONE,  /**< Not a mailbox datagram. */
+    EC_DATAGRAM_MAILBOX_CHECK, /**< Mailbox check datagram. */
+    EC_DATAGRAM_MAILBOX_FETCH, /**< Mailbox fetch datagram. */
+    EC_DATAGRAM_MAILBOX_SEND,  /**< Mailbox send datagram. */
+} ec_datagram_mailbox_datagram_type_t;
+
+/*****************************************************************************/
+
 /** EtherCAT datagram.
  */
 typedef struct {
@@ -109,6 +123,11 @@ typedef struct {
     unsigned int skip_count; /**< Number of requeues when not yet received. */
     unsigned long stats_output_jiffies; /**< Last statistics output. */
     char name[EC_DATAGRAM_NAME_SIZE]; /**< Description of the datagram. */
+
+    int mailbox_send_retries;
+    ec_datagram_mailbox_datagram_type_t mailbox_datagram_type;
+    ec_slave_t *mailbox_slave;
+    uint8_t mailbox_protocol;
 } ec_datagram_t;
 
 /*****************************************************************************/
