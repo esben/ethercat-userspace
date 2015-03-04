@@ -1330,6 +1330,23 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
                 }
             }
         }
+
+        // When several sources try to send to the mailbox simultaneously,
+        // only one will succeed. The other datagrams are not processed by
+        // the slave which can be seen by a working_counter which is still 0.
+        // Instead of making all users retry the sending, we do it here
+        // centrally. We limit the number of retries to avoid infinite
+        // retries in case of invalid send datagrams.
+        if (ec_slave_is_mbox_datagram(datagram, EC_DATAGRAM_MAILBOX_SEND,
+                                      &mbox_slave, &mbox_prot)
+            && datagram->working_counter == 0
+            && datagram->mailbox_send_retries > 0) {
+            datagram->mailbox_send_retries--;
+            if (unlikely(master->debug_level > 1))
+                EC_SLAVE_INFO(mbox_slave, "retrying mailbox send"
+                    " datagram %p\n", datagram);
+            ec_master_queue_datagram(master, datagram);
+        }
     }
 }
 
