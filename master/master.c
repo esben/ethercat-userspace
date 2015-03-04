@@ -2744,8 +2744,8 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
 
     if (request.req.state == EC_INT_REQUEST_SUCCESS) {
         retval = 0;
-    } else if (request.req.errno) {
-        retval = -request.req.errno;
+    } else if (request.req.errno_) {
+        retval = -request.req.errno_;
     } else {
         retval = -EIO;
     }
@@ -2829,8 +2829,8 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
 
     if (request.req.state == EC_INT_REQUEST_SUCCESS) {
         return 0;
-    } else if (request.req.errno) {
-        return -request.req.errno;
+    } else if (request.req.errno_) {
+        return -request.req.errno_;
     } else {
         return -EIO;
     }
@@ -2903,8 +2903,8 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
 
     if (request.req.state != EC_INT_REQUEST_SUCCESS) {
         *result_size = 0;
-        if (request.req.errno) {
-            retval = -request.req.errno;
+        if (request.req.errno_) {
+            retval = -request.req.errno_;
         } else {
             retval = -EIO;
         }
