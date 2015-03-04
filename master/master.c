@@ -188,12 +188,12 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 #endif
 
     sema_init(&master->io_sem, 1);
-    master->send_cb = NULL;
-    master->receive_cb = NULL;
-    master->cb_data = NULL;
-    master->app_send_cb = NULL;
-    master->app_receive_cb = NULL;
-    master->app_cb_data = NULL;
+    master->fsm_queue_lock_cb = ec_master_internal_lock_cb;
+    master->fsm_queue_unlock_cb = ec_master_internal_unlock_cb;
+    master->fsm_queue_locking_data = master;
+    master->app_fsm_queue_lock_cb = NULL;
+    master->app_fsm_queue_unlock_cb = NULL;
+    master->app_fsm_queue_locking_data = NULL;
 
     INIT_LIST_HEAD(&master->sii_requests);
     init_waitqueue_head(&master->sii_queue);
@@ -407,13 +407,13 @@ void ec_master_clear_slaves(ec_master_t *master)
         wake_up(&master->reg_queue);
     }
 
-    down(&master->io_sem);  // backported
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
     for (slave = master->slaves;
             slave < master->slaves + master->slave_count;
             slave++) {
         ec_slave_clear(slave);
     }
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
 
     if (master->slaves) {
         kfree(master->slaves);
@@ -431,13 +431,13 @@ void ec_master_clear_domains(ec_master_t *master)
 {
     ec_domain_t *domain, *next;
 
-    down(&master->io_sem);  // backported
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
     list_for_each_entry_safe(domain, next, &master->domains, list) {
         list_del(&domain->list);
         ec_domain_clear(domain);
         kfree(domain);
     }
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
 }
 
 /*****************************************************************************/
@@ -458,27 +458,23 @@ void ec_master_clear_config(
 
 /** Internal sending callback.
  */
-void ec_master_internal_send_cb(
+void ec_master_internal_lock_cb(
         void *cb_data /**< Callback data. */
         )
 {
     ec_master_t *master = (ec_master_t *) cb_data;
     down(&master->io_sem);
-    ecrt_master_send_ext(master);
-    up(&master->io_sem);
 }
 
 /*****************************************************************************/
 
 /** Internal receiving callback.
  */
-void ec_master_internal_receive_cb(
+void ec_master_internal_unlock_cb(
         void *cb_data /**< Callback data. */
         )
 {
     ec_master_t *master = (ec_master_t *) cb_data;
-    down(&master->io_sem);
-    ecrt_master_receive(master);
     up(&master->io_sem);
 }
 
@@ -549,9 +545,9 @@ int ec_master_enter_idle_phase(
 
     EC_MASTER_DBG(master, 1, "ORPHANED -> IDLE.\n");
 
-    master->send_cb = ec_master_internal_send_cb;
-    master->receive_cb = ec_master_internal_receive_cb;
-    master->cb_data = master;
+    master->fsm_queue_lock_cb = ec_master_internal_lock_cb;
+    master->fsm_queue_unlock_cb = ec_master_internal_unlock_cb;
+    master->fsm_queue_locking_data = master;
 
     master->phase = EC_IDLE;
 
@@ -654,9 +650,9 @@ int ec_master_enter_operation_phase(ec_master_t *master /**< EtherCAT master */)
 #endif
 
     master->phase = EC_OPERATION;
-    master->app_send_cb = NULL;
-    master->app_receive_cb = NULL;
-    master->app_cb_data = NULL;
+    master->app_fsm_queue_lock_cb = NULL;
+    master->app_fsm_queue_unlock_cb = NULL;
+    master->app_fsm_queue_locking_data = NULL;
     return ret;
     
 out_allow:
@@ -790,7 +786,7 @@ void ec_master_queue_external_datagram(
 {
     ec_datagram_t *queued_datagram;
 
-    down(&master->io_sem);
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
 
     // check, if the datagram is already queued
     list_for_each_entry(queued_datagram, &master->external_datagram_queue,
@@ -814,7 +810,7 @@ void ec_master_queue_external_datagram(
     datagram->jiffies_sent = jiffies;
 
     master->fsm.idle = 0;
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
 }
 
 /*****************************************************************************/
@@ -1510,9 +1506,9 @@ static int ec_master_idle_thread(void *priv_data)
         ec_datagram_output_stats(&master->fsm_datagram);
 
         // receive
-        down(&master->io_sem);
+        master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
         ecrt_master_receive(master);
-        up(&master->io_sem);
+        master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
 
         fsm_exec = 0;
         // execute master & slave state machines
@@ -1527,12 +1523,12 @@ static int ec_master_idle_thread(void *priv_data)
         up(&master->master_sem);
 
         // queue and send
-        down(&master->io_sem);
+        master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
         if (fsm_exec) {
             ec_master_queue_datagram(master, &master->fsm_datagram);
         }
         sent_bytes = ecrt_master_send(master);
-        up(&master->io_sem);
+        master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
 
         if (ec_fsm_master_idle(&master->fsm)) {
 #ifdef EC_USE_HRTIMER
@@ -1629,12 +1625,6 @@ void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
     if (list_empty(&master->eoe_handlers))
         return;
 
-    if (!master->send_cb || !master->receive_cb) {
-        EC_MASTER_WARN(master, "No EoE processing"
-                " because of missing callbacks!\n");
-        return;
-    }
-
     EC_MASTER_INFO(master, "Starting EoE thread.\n");
     master->eoe_thread = kthread_run(ec_master_eoe_thread, master,
             "EtherCAT-EoE");
@@ -1691,7 +1681,9 @@ static int ec_master_eoe_thread(void *priv_data)
             goto schedule;
 
         // receive datagrams
-        master->receive_cb(master->cb_data);
+        master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
+        ecrt_master_receive(master);
+        master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
 
         // actual EoE processing
         sth_to_send = 0;
@@ -1711,9 +1703,11 @@ static int ec_master_eoe_thread(void *priv_data)
                 ec_eoe_queue(eoe);
             }
             // (try to) send datagrams
+            master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
             down(&master->ext_queue_sem);
-            master->send_cb(master->cb_data);
+            ecrt_master_send_ext(master);
             up(&master->ext_queue_sem);
+            master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
         }
 
 schedule:
@@ -2256,10 +2250,12 @@ int ecrt_master_activate(ec_master_t *master)
     master->injection_seq_fsm = 0;
     master->injection_seq_rt = 0;
 
-    master->send_cb = master->app_send_cb;
-    master->receive_cb = master->app_receive_cb;
-    master->cb_data = master->app_cb_data;
-    
+    if (master->app_fsm_queue_lock_cb && master->app_fsm_queue_unlock_cb) {
+        master->fsm_queue_lock_cb = master->app_fsm_queue_lock_cb;
+        master->fsm_queue_unlock_cb = master->app_fsm_queue_unlock_cb;
+        master->fsm_queue_locking_data = master->app_fsm_queue_locking_data;
+    }
+
 #ifdef EC_EOE
     if (eoe_was_running) {
         ec_master_eoe_start(master);
@@ -2304,10 +2300,10 @@ void ecrt_master_deactivate(ec_master_t *master)
     ec_master_eoe_stop(master);
 #endif
     
-    master->send_cb = ec_master_internal_send_cb;
-    master->receive_cb = ec_master_internal_receive_cb;
-    master->cb_data = master;
-    
+    master->fsm_queue_lock_cb = ec_master_internal_lock_cb;
+    master->fsm_queue_unlock_cb = ec_master_internal_unlock_cb;
+    master->fsm_queue_locking_data = master;
+
     ec_master_clear_config(master);
 
     for (slave = master->slaves;
@@ -2597,15 +2593,16 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
 /*****************************************************************************/
 
 void ecrt_master_callbacks(ec_master_t *master,
-        void (*send_cb)(void *), void (*receive_cb)(void *), void *cb_data)
+                           void (*lock_cb)(void *), void (*unlock_cb)(void *),
+                           void *cb_data)
 {
-    EC_MASTER_DBG(master, 1, "ecrt_master_callbacks(master = 0x%p,"
-            " send_cb = 0x%p, receive_cb = 0x%p, cb_data = 0x%p)\n",
-            master, send_cb, receive_cb, cb_data);
+    EC_MASTER_DBG(master, 1,"ecrt_master_callbacks(master = %p, "
+                            "lock_cb = %p, unlock_cb = %p, cb_data = %p)\n",
+                            master, lock_cb, unlock_cb, cb_data);
 
-    master->app_send_cb = send_cb;
-    master->app_receive_cb = receive_cb;
-    master->app_cb_data = cb_data;
+    master->app_fsm_queue_lock_cb = lock_cb;
+    master->app_fsm_queue_unlock_cb = unlock_cb;
+    master->app_fsm_queue_locking_data = cb_data;
 }
 
 /*****************************************************************************/

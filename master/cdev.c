@@ -1696,8 +1696,8 @@ int ec_cdev_ioctl_activate(
         }
     }
 
-    ecrt_master_callbacks(master, ec_master_internal_send_cb,
-            ec_master_internal_receive_cb, master);
+    ecrt_master_callbacks(master, ec_master_internal_lock_cb,
+            ec_master_internal_unlock_cb, master);
 
     ret = ecrt_master_activate(master);
     if (ret < 0)
@@ -1766,9 +1766,9 @@ int ec_cdev_ioctl_send(
     if (unlikely(!priv->requested))
         return -EPERM;
 
-    down(&master->io_sem);
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
     ecrt_master_send(master);
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
     return 0;
 }
 
@@ -1785,9 +1785,9 @@ int ec_cdev_ioctl_receive(
     if (unlikely(!priv->requested))
         return -EPERM;
 
-    down(&master->io_sem);
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
     ecrt_master_receive(master);
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
     return 0;
 }
 
@@ -1850,9 +1850,9 @@ int ec_cdev_ioctl_sync_ref(
     if (unlikely(!priv->requested))
         return -EPERM;
 
-    down(&master->io_sem);
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
     ecrt_master_sync_reference_clock(master);
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
     return 0;
 }
 
@@ -1869,9 +1869,9 @@ int ec_cdev_ioctl_sync_slaves(
     if (unlikely(!priv->requested))
         return -EPERM;
 
-    down(&master->io_sem);
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
     ecrt_master_sync_slave_clocks(master);
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
     return 0;
 }
 
@@ -1888,9 +1888,9 @@ int ec_cdev_ioctl_sync_mon_queue(
     if (unlikely(!priv->requested))
         return -EPERM;
 
-    down(&master->io_sem);
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
     ecrt_master_sync_monitor_queue(master);
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
     return 0;
 }
 
@@ -1909,9 +1909,9 @@ int ec_cdev_ioctl_sync_mon_process(
     if (unlikely(!priv->requested))
         return -EPERM;
 
-    down(&master->io_sem);
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
     time_diff = ecrt_master_sync_monitor_process(master);
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
 
     if (copy_to_user((void __user *) arg, &time_diff, sizeof(time_diff)))
         return -EFAULT;
@@ -2568,9 +2568,9 @@ int ec_cdev_ioctl_domain_queue(
         return -ENOENT;
     }
 
-    down(&master->io_sem);
+    master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
     ecrt_domain_queue(domain);
-    up(&master->io_sem);
+    master->fsm_queue_unlock_cb(master->fsm_queue_locking_data);
     return 0;
 }
 
