@@ -2568,7 +2568,9 @@ int ec_cdev_ioctl_domain_queue(
         return -ENOENT;
     }
 
+    down(&master->io_sem);
     ecrt_domain_queue(domain);
+    up(&master->io_sem);
     return 0;
 }
 
