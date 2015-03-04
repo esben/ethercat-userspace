@@ -3386,7 +3386,8 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 				if (!__pskb_pull_tail(skb, pull_size)) {
 					DPRINTK(DRV, ERR,
 						"__pskb_pull_tail failed.\n");
-					dev_kfree_skb_any(skb);
+					if (!adapter->ecdev)
+						dev_kfree_skb_any(skb);
 					return NETDEV_TX_OK;
 				}
 				len = skb->len - skb->data_len;
@@ -3936,7 +3937,7 @@ e1000_intr(int irq, void *data)
 #ifdef CONFIG_E1000_NAPI
 	/* IMS will not auto-mask if INT_ASSERTED is not set, and if it is
 	 * not set, then the adapter didn't send an interrupt */
-	if (unlikely(hw->mac_type >= e1000_82571 &&
+	if (!adapter->ecdev && unlikely(hw->mac_type >= e1000_82571 &&
 	             !(icr & E1000_ICR_INT_ASSERTED)))
 		return IRQ_NONE;
 
