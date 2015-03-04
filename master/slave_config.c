@@ -989,6 +989,7 @@ void ecrt_slave_config_state(const ec_slave_config_t *sc,
         state->operational = 0;
         state->al_state = EC_SLAVE_STATE_UNKNOWN;
     }
+    state->sdo_dictionary_fetched = sc->slave->sdo_dictionary_fetched;
 }
 
 /*****************************************************************************/

@@ -326,6 +326,7 @@ int ec_cdev_ioctl_slave(
     data.has_dc_system_time = slave->has_dc_system_time;
     data.transmission_delay = slave->transmission_delay;
     data.al_state = slave->current_state;
+    data.sdo_dictionary_fetched = slave->sdo_dictionary_fetched;
     data.error_flag = slave->error_flag;
 
     data.sync_count = slave->sii.sync_count;

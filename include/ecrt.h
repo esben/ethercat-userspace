@@ -210,6 +210,8 @@ typedef struct  {
 
                                  Note that each state is coded in a different
                                  bit! */
+    unsigned int sdo_dictionary_fetched : 1; /**< SDO dictionary
+                                               has been fetched. */
 } ec_slave_config_state_t;
 
 /*****************************************************************************/
@@ -274,6 +276,7 @@ typedef struct {
         uint32_t delay_to_next_dc; /**< Delay [ns] to next DC slave. */
     } ports[EC_MAX_PORTS]; /**< Port information. */
     uint8_t al_state; /**< Current state of the slave. */
+    uint8_t sdo_dictionary_fetched : 1; /**< SDO dictionary has been fetched. */
     uint8_t error_flag; /**< Error flag for that slave. */
     uint8_t sync_count; /**< Number of sync managers. */
     uint16_t sdo_count; /**< Number of SDOs. */

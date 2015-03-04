@@ -510,8 +510,6 @@ void ec_fsm_master_action_idle(
 
         EC_SLAVE_DBG(slave, 1, "Fetching SDO dictionary.\n");
 
-        slave->sdo_dictionary_fetched = 1;
-
         // start fetching SDO dictionary
         fsm->idle = 0;
         fsm->slave = slave;
@@ -1136,6 +1134,9 @@ void ec_fsm_master_state_sdo_dictionary(
     ec_master_t *master = fsm->master;
 
     if (ec_fsm_coe_exec(&fsm->fsm_coe)) return;
+
+    slave->sdo_dictionary_fetched = 1;
+    EC_SLAVE_INFO(slave, "SDO dictionary fetched\n");
 
     if (!ec_fsm_coe_success(&fsm->fsm_coe)) {
         ec_fsm_master_restart(fsm);

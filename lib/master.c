@@ -242,6 +242,7 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
     	slave_info->ports[i].delay_to_next_dc = data.ports[i].delay_to_next_dc;
     }
     slave_info->al_state = data.al_state;
+    slave_info->sdo_dictionary_fetched = data.sdo_dictionary_fetched;
     slave_info->error_flag = data.error_flag;
     slave_info->sync_count = data.sync_count;
     slave_info->sdo_count = data.sdo_count;

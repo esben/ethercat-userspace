@@ -133,6 +133,11 @@ void CommandSdos::listSlaveSdos(
         cout << "=== Master " << m.getIndex()
             << ", Slave " << slave.position << " ===" << endl;
 
+    if (!slave.sdo_dictionary_fetched) {
+        cout << "SDO dictionary not yet fetched" << endl;
+        return;
+    }
+
     for (i = 0; i < slave.sdo_count; i++) {
         m.getSdo(&sdo, slave.position, i);
 
