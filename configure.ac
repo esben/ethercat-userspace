@@ -710,6 +710,7 @@ AC_CONFIG_FILES([
         examples/user/Makefile
         include/Makefile
         lib/Makefile
+        lib/libethercat.pc
         m4/Makefile
         master/Kbuild
         master/Makefile

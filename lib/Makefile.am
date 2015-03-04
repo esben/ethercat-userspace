@@ -32,6 +32,13 @@ AM_CFLAGS = -Wall
 
 lib_LTLIBRARIES = libethercat.la
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libethercat.pc
+EXTRA_DIST = libethercat.pc.in
+
+clean-local:
+	rm -f libethercat.pc
+
 #------------------------------------------------------------------------------
 
 libethercat_la_LDFLAGS = -version-info 1:0:0
