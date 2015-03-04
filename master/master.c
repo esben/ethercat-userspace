@@ -786,6 +786,9 @@ void ec_master_queue_external_datagram(
 {
     ec_datagram_t *queued_datagram;
 
+    if (datagram->state == EC_DATAGRAM_INVALID)
+        return;
+
     master->fsm_queue_lock_cb(master->fsm_queue_locking_data);
 
     // check, if the datagram is already queued

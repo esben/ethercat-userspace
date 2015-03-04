@@ -136,7 +136,7 @@ int ec_fsm_master_exec(
     }
 
     fsm->state(fsm);
-    return 1;
+    return fsm->datagram->state != EC_DATAGRAM_INVALID;
 }
 
 /*****************************************************************************/

@@ -232,9 +232,34 @@ void ec_fsm_coe_transfer(
 
 int ec_fsm_coe_exec(ec_fsm_coe_t *fsm /**< finite state machine */)
 {
+    ec_slave_t *slave = fsm->slave;
+
+    if (fsm->state == ec_fsm_coe_end || fsm->state == ec_fsm_coe_error)
+        return 0;
+
+    // prevent concurrent access; somewhat fair scheduling (not very
+    // sophisticated, just to make sure a fast task cannot starve a slower one)
+    if (slave->coe_in_use_by && slave->coe_in_use_by != fsm) {
+        if (!slave->coe_waiting_for) {
+            slave->coe_waiting_for = fsm;
+            if (unlikely(slave->master->debug_level > 1))
+                EC_SLAVE_INFO(slave, "deferring concurrent CoE access\n");
+        }
+        fsm->datagram->state = EC_DATAGRAM_INVALID;
+        return 1;
+    }
+    slave->coe_in_use_by = fsm;
+
     fsm->state(fsm);
 
-    return fsm->state != ec_fsm_coe_end && fsm->state != ec_fsm_coe_error;
+    if (fsm->state == ec_fsm_coe_end || fsm->state == ec_fsm_coe_error) {
+        if (slave->coe_in_use_by == fsm) {
+            slave->coe_in_use_by = slave->coe_waiting_for;
+            slave->coe_waiting_for = NULL;
+        }
+        return 0;
+    }
+    return 1;
 }
 
 /*****************************************************************************/

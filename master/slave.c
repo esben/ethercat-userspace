@@ -186,6 +186,7 @@ void ec_slave_init(
         EC_SLAVE_ERR(slave, "Failed to allocate TX mailbox fetch datagram.\n");
         return;
     }
+    slave->coe_in_use_by = slave->coe_waiting_for = NULL;
 
     // create state machine object
     ec_fsm_slave_init(&slave->fsm, slave, &slave->fsm_datagram);

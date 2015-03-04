@@ -255,6 +255,7 @@ struct ec_slave
     int tx_mailbox_filled;
     int tx_mailbox_fetching;
     ec_datagram_t tx_fetch; /**< To fetch the mailbox internally if necessary. */
+    ec_fsm_coe_t *coe_in_use_by, *coe_waiting_for;
 };
 
 /*****************************************************************************/
