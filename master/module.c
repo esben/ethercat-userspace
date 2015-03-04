@@ -606,6 +606,24 @@ void ecrt_release_master(ec_master_t *master)
 
 /*****************************************************************************/
 
+ec_master_t *ecrt_open_master(
+        unsigned int master_index /**< Master index. */
+        )
+{
+    if (master_index >= master_count) {
+        EC_ERR("Invalid master index %u.\n", master_index);
+        return NULL;
+    }
+    ec_master_t *master = &masters[master_index];
+    if (!master->main_device.dev) {
+        EC_MASTER_ERR(master,"Master has no device attached.\n");
+        return NULL;
+    }
+    return master;
+}
+
+/*****************************************************************************/
+
 unsigned int ecrt_version_magic(void)
 {
     return ECRT_VERSION_MAGIC;

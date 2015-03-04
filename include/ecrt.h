@@ -462,11 +462,10 @@ ec_master_t *ecrt_request_master(
         unsigned int master_index /**< Index of the master to request. */
         );
 
-#ifndef __KERNEL__
-
 /** Opens an EtherCAT master for userspace access.
  *
- * This function has to be the first function an application has to call to
+ * This function does not reserve the master; do not call ecrt_release_master.
+ * In userspace, it has to be the first function an application has to call to
  * use EtherCAT. The function takes the index of the master as its argument.
  * The first master has index 0, the n-th master has index n - 1. The number
  * of masters has to be specified when loading the master module.
@@ -478,8 +477,6 @@ ec_master_t *ecrt_request_master(
 ec_master_t *ecrt_open_master(
         unsigned int master_index /**< Index of the master to request. */
         );
-
-#endif // #ifndef __KERNEL__
 
 /** Releases a requested EtherCAT master.
  *
