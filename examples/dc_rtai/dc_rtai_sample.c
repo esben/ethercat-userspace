@@ -65,7 +65,9 @@ static ec_domain_state_t domain1_state = {};
 // RTAI
 static RT_TASK task;
 static SEM master_sem;
-static cycles_t t_last_cycle = 0, t_critical;
+static volatile int cyclic_task_stopped = 0;
+static volatile cycles_t t_last_cycle = 0;
+static cycles_t t_critical;
 
 /*****************************************************************************/
 
@@ -236,6 +238,9 @@ void run(long data)
 
 void request_lock_callback(void *cb_data)
 {
+    // too close to the next real time cycle: wait ...
+    while (!cyclic_task_stopped && get_cycles() - t_last_cycle > t_critical)
+        schedule();
     rt_sem_wait(&master_sem);
 }
 
@@ -369,6 +374,7 @@ void __exit cleanup_mod(void)
 
     rt_task_delete(&task);
     stop_rt_timer();
+    cyclic_task_stopped = 1;
     // re-enable the debug interface in case the task was deleted while it was disabled
     ec_debug_disable(0);
     ecrt_release_master(master);
