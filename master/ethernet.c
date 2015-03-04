@@ -702,6 +702,9 @@ void ec_eoe_state_tx_sent(ec_eoe_t *eoe /**< EoE handler */)
             eoe->tries--; // try again
             eoe->queue_datagram = 1;
         } else {
+            dev_kfree_skb(eoe->tx_frame->skb);
+            kfree(eoe->tx_frame);
+            eoe->tx_frame = NULL;
             eoe->stats.tx_errors++;
 #if EOE_DEBUG_LEVEL >= 1
             EC_SLAVE_WARN(eoe->slave, "Failed to receive send"
@@ -718,6 +721,9 @@ void ec_eoe_state_tx_sent(ec_eoe_t *eoe /**< EoE handler */)
             eoe->tries--; // try again
             eoe->queue_datagram = 1;
         } else {
+            dev_kfree_skb(eoe->tx_frame->skb);
+            kfree(eoe->tx_frame);
+            eoe->tx_frame = NULL;
             eoe->stats.tx_errors++;
 #if EOE_DEBUG_LEVEL >= 1
             EC_SLAVE_WARN(eoe->slave, "No sending response"
