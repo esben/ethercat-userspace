@@ -1471,6 +1471,12 @@ void ecrt_sdo_request_read(
         ec_sdo_request_t *req /**< SDO request. */
         );
 
+/** Temporarily disable the debug interface.
+ */
+void ec_debug_disable(
+        int disable /**< 1 to disable, 0 to re-enable. */
+        );
+
 /*****************************************************************************
  * VoE handler methods.
  ****************************************************************************/

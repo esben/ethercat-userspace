@@ -44,6 +44,8 @@
 
 /*****************************************************************************/
 
+static int ec_debug_disabled = 0;
+
 // net_device functions
 int ec_dbgdev_open(struct net_device *);
 int ec_dbgdev_stop(struct net_device *);
@@ -172,7 +174,7 @@ void ec_debug_send(
 {
     struct sk_buff *skb;
 
-    if (!dbg->opened)
+    if (!dbg->opened || ec_debug_disabled)
         return;
 
     // allocate socket buffer
@@ -193,6 +195,17 @@ void ec_debug_send(
     skb->protocol = eth_type_trans(skb, dbg->dev);
     skb->ip_summed = CHECKSUM_UNNECESSARY;
     netif_rx(skb);
+}
+
+/*****************************************************************************/
+
+/**
+   Temporarily disable the debug interface.
+*/
+
+void ec_debug_disable(int disable)
+{
+    ec_debug_disabled = disable;
 }
 
 /******************************************************************************
@@ -254,5 +267,13 @@ struct net_device_stats *ec_dbgdev_stats(
     ec_debug_t *dbg = *((ec_debug_t **) netdev_priv(dev));
     return &dbg->stats;
 }
+
+/*****************************************************************************/
+
+/** \cond */
+
+EXPORT_SYMBOL(ec_debug_disable);
+
+/** \endcond */
 
 /*****************************************************************************/

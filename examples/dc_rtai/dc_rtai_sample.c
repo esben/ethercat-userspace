@@ -171,8 +171,12 @@ void run(long data)
 
         // receive process data
         rt_sem_wait(&master_sem);
+        // disable the debug interface which is not RTAI-safe
+        ec_debug_disable(1);
         ecrt_master_receive(master);
         ecrt_domain_process(domain1);
+        // re-enable the debug interface
+        ec_debug_disable(0);
         rt_sem_signal(&master_sem);
 
         // check process data state (optional)
@@ -213,6 +217,8 @@ void run(long data)
         EC_WRITE_U8(domain1_pd + off_counter_out, blink ? 0x00 : 0x02);
 
         rt_sem_wait(&master_sem);
+        // disable the debug interface which is not RTAI-safe
+        ec_debug_disable(1);
 
         tv.tv_usec += 1000;
         if (tv.tv_usec >= 1000000)  {
@@ -230,6 +236,8 @@ void run(long data)
         ecrt_master_sync_slave_clocks(master);
         ecrt_domain_queue(domain1);
         ecrt_master_send(master);
+        // re-enable the debug interface
+        ec_debug_disable(0);
         rt_sem_signal(&master_sem);
 
         rt_task_wait_period();
@@ -387,6 +395,8 @@ void __exit cleanup_mod(void)
 
     rt_task_delete(&task);
     stop_rt_timer();
+    // re-enable the debug interface in case the task was deleted while it was disabled
+    ec_debug_disable(0);
     ecrt_release_master(master);
     rt_sem_delete(&master_sem);
 
