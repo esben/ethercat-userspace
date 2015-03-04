@@ -121,6 +121,7 @@ string usage()
         << "  --quiet   -q           Output less information." << endl
         << "  --verbose -v           Output more information." << endl
         << "  --help    -h           Show this help." << endl
+        << "  --version -V           Show version information and exit." << endl
         << endl
         << Command::numericInfo()
         << endl
@@ -151,11 +152,12 @@ void getOptions(int argc, char **argv)
         {"quiet",       no_argument,       NULL, 'q'},
         {"verbose",     no_argument,       NULL, 'v'},
         {"help",        no_argument,       NULL, 'h'},
+        {"version",     no_argument,       NULL, 'V'},
         {}
     };
 
     do {
-        c = getopt_long(argc, argv, "m:a:p:d:t:o:fqvh", longOptions, NULL);
+        c = getopt_long(argc, argv, "m:a:p:d:t:o:fqvhV", longOptions, NULL);
 
         switch (c) {
             case 'm':
@@ -197,6 +199,17 @@ void getOptions(int argc, char **argv)
             case 'h':
                 helpRequested = true;
                 break;
+
+            case 'V':
+                cout << "ethercat " EC_MASTER_VERSION "\n\n"
+                        "EtherCAT command-line tool\n\n"
+                        "This is free software; see the source for copying conditions.\n"
+                        "There is NO warranty; not even for MERCHANTABILITY or\n"
+                        "FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+                        "For more information about these matters, see the file named\n"
+                        "COPYING.\n\n"
+                        "Report bugs to " PACKAGE_BUGREPORT "." << endl;
+                exit(0);
 
             case '?':
                 cerr << endl << usage();

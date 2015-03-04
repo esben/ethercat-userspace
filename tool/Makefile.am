@@ -35,6 +35,14 @@ EXTRA_DIST =
 
 bin_PROGRAMS = ethercat
 
+dist_man_MANS = ethercat.1
+
+ethercat.1: ethercat$(EXEEXT)
+	PATH=".:$$PATH" help2man -o "$@" "$<" -s1 -n"EtherCAT command-line tool" --no-info
+
+clean-local:
+	rm -f ethercat.1
+
 ethercat_SOURCES = \
 	../master/soe_errors.c \
 	Command.cpp \
@@ -129,6 +137,7 @@ ethercat_CXXFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/master \
 	-Wall -DREV=$(REV) \
+	-Wall -DREV=$(REV) -Werror \
 	-fno-strict-aliasing
 
 #------------------------------------------------------------------------------
