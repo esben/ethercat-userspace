@@ -901,7 +901,7 @@ int ec_cdev_ioctl_slave_sdo_download(
         return -ENOMEM;
     }
 
-    if (copy_from_user(sdo_data, (void __user *) data.data, data.data_size)) {
+    if (copy_from_user(sdo_data, (const void __user *) data.data, data.data_size)) {
         kfree(sdo_data);
         return -EFAULT;
     }

@@ -2395,10 +2395,11 @@ uint32_t ecrt_master_sync_monitor_process(ec_master_t *master)
 /*****************************************************************************/
 
 int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
-        uint16_t index, uint8_t subindex, uint8_t *data,
+        uint16_t index, uint8_t subindex, const uint8_t *data,
         size_t data_size, uint32_t *abort_code)
 {
     ec_master_sdo_request_t request;
+    int retval;
 
     EC_MASTER_DBG(master, 1, "%s(master = 0x%p,"
             " slave_position = %u, index = 0x%04X, subindex = 0x%02X,"
@@ -2422,8 +2423,10 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
     request.req.data_size = data_size;
     ecrt_sdo_request_write(&request.req);
 
-    if (down_interruptible(&master->master_sem))
+    if (down_interruptible(&master->master_sem)) {
+        ec_sdo_request_clear(&request.req);
         return -EINTR;
+    }
 
     if (!(request.slave = ec_master_find_slave(master, 0, slave_position))) {
         up(&master->master_sem);
@@ -2462,19 +2465,25 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
 
     *abort_code = request.req.abort_code;
 
+    if (request.req.state == EC_INT_REQUEST_QUEUED)
+        list_del(&request.list);
+
     if (request.req.state == EC_INT_REQUEST_SUCCESS) {
-        return 0;
+        retval = 0;
     } else if (request.req.errno) {
-        return -request.req.errno;
+        retval = -request.req.errno;
     } else {
-        return -EIO;
+        retval = -EIO;
     }
+
+    ec_sdo_request_clear(&request.req);
+    return retval;
 }
 
 /*****************************************************************************/
 
 int ecrt_master_sdo_download_complete(ec_master_t *master,
-        uint16_t slave_position, uint16_t index, uint8_t *data,
+        uint16_t slave_position, uint16_t index, const uint8_t *data,
         size_t data_size, uint32_t *abort_code)
 {
     ec_master_sdo_request_t request;
@@ -2574,6 +2583,7 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
     ecrt_sdo_request_read(&request.req);
 
     if (down_interruptible(&master->master_sem)) {
+        ec_sdo_request_clear(&request.req);
         return -EINTR;
     }
 
@@ -2613,6 +2623,9 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
     EC_SLAVE_DBG(request.slave, 1, "Finished SDO upload request.\n");
 
     *abort_code = request.req.abort_code;
+
+    if (request.req.state == EC_INT_REQUEST_QUEUED)
+        list_del(&request.list);
 
     if (request.req.state != EC_INT_REQUEST_SUCCESS) {
         *result_size = 0;
