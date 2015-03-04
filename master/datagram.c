@@ -521,6 +521,9 @@ void ec_datagram_print_state(
         case EC_DATAGRAM_INIT:
             printk("initialized");
             break;
+        case EC_DATAGRAM_PREQUEUED:
+            printk("prequeued");
+            break;
         case EC_DATAGRAM_QUEUED:
             printk("queued");
             break;

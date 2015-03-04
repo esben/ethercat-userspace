@@ -327,7 +327,10 @@ void ec_eoe_run(ec_eoe_t *eoe /**< EoE handler */)
         return;
 
     // if the datagram was not sent, or is not yet received, skip this cycle
-    if (eoe->queue_datagram || eoe->datagram.state == EC_DATAGRAM_SENT)
+    if (eoe->queue_datagram
+        || eoe->datagram.state == EC_DATAGRAM_SENT
+        || eoe->datagram.state == EC_DATAGRAM_QUEUED
+        || eoe->datagram.state == EC_DATAGRAM_PREQUEUED)
         return;
 
     // call state function
@@ -353,6 +356,7 @@ void ec_eoe_queue(ec_eoe_t *eoe /**< EoE handler */)
 {
    if (eoe->queue_datagram) {
        ec_master_queue_datagram_ext(eoe->slave->master, &eoe->datagram);
+       eoe->datagram.state = EC_DATAGRAM_PREQUEUED;
        eoe->queue_datagram = 0;
    }
 }

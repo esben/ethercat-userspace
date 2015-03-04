@@ -76,6 +76,7 @@ typedef enum {
  */
 typedef enum {
     EC_DATAGRAM_INIT,      /**< Initial state of a new datagram. */
+    EC_DATAGRAM_PREQUEUED, /**< Queued for queueing. */
     EC_DATAGRAM_QUEUED,    /**< Queued for sending. */
     EC_DATAGRAM_SENT,      /**< Sent (still in the queue). */
     EC_DATAGRAM_RECEIVED,  /**< Received (dequeued). */
