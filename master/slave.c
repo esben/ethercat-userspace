@@ -170,8 +170,50 @@ void ec_slave_init(
         return;
     }
 
+    // init mailbox data
+    slave->tx_mailbox_buffer = NULL;
+    for (i = 0; i < EC_MBOX_MAX_PROTOCOL; i++)
+        slave->tx_mailbox_buffer_head[i] =
+        slave->tx_mailbox_buffers_used[i] = 0;
+    slave->tx_mailbox_filled = slave->tx_mailbox_fetching = 0;
+
+    ec_datagram_init(&slave->tx_fetch);
+    snprintf(slave->tx_fetch.name, EC_DATAGRAM_NAME_SIZE,
+            "slave%u-tx_fetch", slave->ring_position);
+    ret = ec_datagram_prealloc(&slave->tx_fetch, EC_MAX_DATA_SIZE);
+    if (ret < 0) {
+        ec_datagram_clear(&slave->tx_fetch);
+        EC_SLAVE_ERR(slave, "Failed to allocate TX mailbox fetch datagram.\n");
+        return;
+    }
+
     // create state machine object
     ec_fsm_slave_init(&slave->fsm, slave, &slave->fsm_datagram);
+}
+
+void ec_slave_set_configured_tx_mailbox_size(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        uint16_t configured_tx_mailbox_size /**< new TX mailbox size */
+        )
+{
+    unsigned int i;
+
+    if (configured_tx_mailbox_size == slave->configured_tx_mailbox_size)
+        return;
+
+    slave->configured_tx_mailbox_size = configured_tx_mailbox_size;
+
+    for (i = 0; i < EC_MBOX_MAX_PROTOCOL; i++)
+        slave->tx_mailbox_buffer_head[i] =
+        slave->tx_mailbox_buffers_used[i] = 0;
+
+    kfree(slave->tx_mailbox_buffer);
+    if (!(slave->tx_mailbox_buffer = kmalloc(sizeof(uint8_t) *
+          configured_tx_mailbox_size * EC_MBOX_MAX_PROTOCOL * EC_MBOX_BUFFERS,
+          GFP_KERNEL))) {
+        EC_SLAVE_ERR(slave, "Failed to allocate mailbox buffer memory.\n");
+        return;
+    }
 }
 
 /*****************************************************************************/
@@ -253,6 +295,8 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         kfree(slave->sii_words);
     ec_fsm_slave_clear(&slave->fsm);
     ec_datagram_clear(&slave->fsm_datagram);
+    ec_datagram_clear(&slave->tx_fetch);
+    kfree(slave->tx_mailbox_buffer);
 }
 
 /*****************************************************************************/

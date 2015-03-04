@@ -868,7 +868,8 @@ void ec_fsm_slave_scan_state_sync(
     slave->configured_rx_mailbox_offset = EC_READ_U16(datagram->data);
     slave->configured_rx_mailbox_size = EC_READ_U16(datagram->data + 2);
     slave->configured_tx_mailbox_offset = EC_READ_U16(datagram->data + 8);
-    slave->configured_tx_mailbox_size = EC_READ_U16(datagram->data + 10);
+    ec_slave_set_configured_tx_mailbox_size(slave,
+        EC_READ_U16(datagram->data + 10));
 
     EC_SLAVE_DBG(slave, 1, "Mailbox configuration:\n");
     EC_SLAVE_DBG(slave, 1, " RX offset=0x%04x size=%u\n",

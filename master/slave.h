@@ -246,6 +246,15 @@ struct ec_slave
                                    space. */
     ec_fsm_slave_t fsm; /**< Slave state machine. */
     ec_datagram_t fsm_datagram; /**< Datagram used for state machines. */
+
+    // Mailbox data
+    uint8_t *tx_mailbox_buffer;
+    uint16_t tx_mailbox_buffer_working_counter[EC_MBOX_MAX_PROTOCOL][EC_MBOX_BUFFERS];
+    int tx_mailbox_buffer_head[EC_MBOX_MAX_PROTOCOL];
+    int tx_mailbox_buffers_used[EC_MBOX_MAX_PROTOCOL];
+    int tx_mailbox_filled;
+    int tx_mailbox_fetching;
+    ec_datagram_t tx_fetch; /**< To fetch the mailbox internally if necessary. */
 };
 
 /*****************************************************************************/
@@ -267,6 +276,8 @@ int ec_slave_fetch_sii_pdos(ec_slave_t *, const uint8_t *, size_t,
         ec_direction_t);
 
 // misc.
+void ec_slave_set_configured_tx_mailbox_size(ec_slave_t *, uint16_t);
+
 ec_sync_t *ec_slave_get_sync(ec_slave_t *, uint8_t); 
 
 void ec_slave_sdo_dict_info(const ec_slave_t *,

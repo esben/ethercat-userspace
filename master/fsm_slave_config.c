@@ -466,8 +466,8 @@ void ec_fsm_slave_config_enter_mbox_sync(
                 datagram->data + EC_SYNC_PAGE_SIZE);
         slave->configured_tx_mailbox_offset =
             slave->sii.boot_tx_mailbox_offset;
-        slave->configured_tx_mailbox_size =
-            slave->sii.boot_tx_mailbox_size;
+        ec_slave_set_configured_tx_mailbox_size(slave,
+            slave->sii.boot_tx_mailbox_size);
 
     } else if (slave->sii.sync_count >= 2) { // mailbox configuration provided
         ec_datagram_fpwr(datagram, slave->station_address, 0x0800,
@@ -488,8 +488,8 @@ void ec_fsm_slave_config_enter_mbox_sync(
             slave->sii.syncs[0].default_length;
         slave->configured_tx_mailbox_offset =
             slave->sii.syncs[1].physical_start_address;
-        slave->configured_tx_mailbox_size =
-            slave->sii.syncs[1].default_length;
+        ec_slave_set_configured_tx_mailbox_size(slave,
+            slave->sii.syncs[1].default_length);
     } else { // no mailbox sync manager configurations provided
         ec_sync_t sync;
 
@@ -523,8 +523,8 @@ void ec_fsm_slave_config_enter_mbox_sync(
                 datagram->data + EC_SYNC_PAGE_SIZE);
         slave->configured_tx_mailbox_offset =
             slave->sii.std_tx_mailbox_offset;
-        slave->configured_tx_mailbox_size =
-            slave->sii.std_tx_mailbox_size;
+        ec_slave_set_configured_tx_mailbox_size(slave,
+            slave->sii.std_tx_mailbox_size);
     }
 
     fsm->take_time = 1;
