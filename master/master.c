@@ -957,6 +957,8 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
     EC_MASTER_DBG(master, 2, "ec_master_send_datagrams\n");
 
     do {
+        int fetch_sent = 0;
+
         // fetch pointer to transmit socket buffer
         frame_data = ec_device_tx_data(&master->main_device);
         cur_data = frame_data + EC_FRAME_HEADER_SIZE;
@@ -969,6 +971,16 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
             uint8_t mbox_prot;
 
             if (datagram->state != EC_DATAGRAM_QUEUED) continue;
+
+            // Checking the mailbox after fetching it in the same frame
+            // can still return "filled" (possibly device-dependent),
+            // so make a new frame for the next check.
+            if (fetch_sent &&
+                ec_slave_is_mbox_datagram(datagram, EC_DATAGRAM_MAILBOX_CHECK,
+                                          &mbox_slave, &mbox_prot)) {
+                more_datagrams_waiting = 1;
+                break;
+            }
 
             // Do not fetch twice simultaneously from the same mailbox.
             // Answer from the internal buffer instead of fetching when
@@ -1008,6 +1020,7 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
                 }
 
                 mbox_slave->tx_mailbox_fetching = 1;
+                fetch_sent = 1;
             }
 
             // does the current datagram fit in the frame?
