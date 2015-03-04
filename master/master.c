@@ -407,11 +407,13 @@ void ec_master_clear_slaves(ec_master_t *master)
         wake_up(&master->reg_queue);
     }
 
+    down(&master->io_sem);  // backported
     for (slave = master->slaves;
             slave < master->slaves + master->slave_count;
             slave++) {
         ec_slave_clear(slave);
     }
+    up(&master->io_sem);
 
     if (master->slaves) {
         kfree(master->slaves);
@@ -429,11 +431,13 @@ void ec_master_clear_domains(ec_master_t *master)
 {
     ec_domain_t *domain, *next;
 
+    down(&master->io_sem);  // backported
     list_for_each_entry_safe(domain, next, &master->domains, list) {
         list_del(&domain->list);
         ec_domain_clear(domain);
         kfree(domain);
     }
+    up(&master->io_sem);
 }
 
 /*****************************************************************************/
