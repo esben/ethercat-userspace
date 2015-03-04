@@ -120,13 +120,11 @@ static ec_sync_info_t el2008_syncs[] = {
 
 /*****************************************************************************/
 
+// Caller must hold master_sem
 void check_domain1_state(void)
 {
     ec_domain_state_t ds;
-
-    rt_sem_wait(&master_sem);
     ecrt_domain_state(domain1, &ds);
-    rt_sem_signal(&master_sem);
 
     if (ds.working_counter != domain1_state.working_counter)
         printk(KERN_INFO PFX "Domain1: WC %u.\n", ds.working_counter);
@@ -138,13 +136,11 @@ void check_domain1_state(void)
 
 /*****************************************************************************/
 
+// Caller must hold master_sem
 void check_master_state(void)
 {
     ec_master_state_t ms;
-
-    rt_sem_wait(&master_sem);
     ecrt_master_state(master, &ms);
-    rt_sem_signal(&master_sem);
 
     if (ms.slaves_responding != master_state.slaves_responding)
         printk(KERN_INFO PFX "%u slave(s).\n", ms.slaves_responding);
@@ -167,17 +163,12 @@ void run(long data)
     count2timeval(nano2count(rt_get_real_time_ns()), &tv);
 
     while (1) {
-        t_last_cycle = get_cycles();
-
         // receive process data
         rt_sem_wait(&master_sem);
         // disable the debug interface which is not RTAI-safe
         ec_debug_disable(1);
         ecrt_master_receive(master);
         ecrt_domain_process(domain1);
-        // re-enable the debug interface
-        ec_debug_disable(0);
-        rt_sem_signal(&master_sem);
 
         // check process data state (optional)
         check_domain1_state();
@@ -216,10 +207,6 @@ void run(long data)
 
         EC_WRITE_U8(domain1_pd + off_counter_out, blink ? 0x00 : 0x02);
 
-        rt_sem_wait(&master_sem);
-        // disable the debug interface which is not RTAI-safe
-        ec_debug_disable(1);
-
         tv.tv_usec += 1000;
         if (tv.tv_usec >= 1000000)  {
             tv.tv_usec -= 1000000;
@@ -240,6 +227,7 @@ void run(long data)
         ec_debug_disable(0);
         rt_sem_signal(&master_sem);
 
+        t_last_cycle = get_cycles();
         rt_task_wait_period();
     }
 }

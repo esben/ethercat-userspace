@@ -141,13 +141,11 @@ static ec_sync_info_t el2004_syncs[] = {
 
 /*****************************************************************************/
 
+// Caller must hold master_sem
 void check_domain1_state(void)
 {
     ec_domain_state_t ds;
-
-    rt_sem_wait(&master_sem);
     ecrt_domain_state(domain1, &ds);
-    rt_sem_signal(&master_sem);
 
     if (ds.working_counter != domain1_state.working_counter)
         printk(KERN_INFO PFX "Domain1: WC %u.\n", ds.working_counter);
@@ -159,13 +157,11 @@ void check_domain1_state(void)
 
 /*****************************************************************************/
 
+// Caller must hold master_sem
 void check_master_state(void)
 {
     ec_master_state_t ms;
-
-    rt_sem_wait(&master_sem);
     ecrt_master_state(master, &ms);
-    rt_sem_signal(&master_sem);
 
     if (ms.slaves_responding != master_state.slaves_responding)
         printk(KERN_INFO PFX "%u slave(s).\n", ms.slaves_responding);
@@ -179,13 +175,11 @@ void check_master_state(void)
 
 /*****************************************************************************/
 
+// Caller must hold master_sem
 void check_slave_config_states(void)
 {
     ec_slave_config_state_t s;
-
-    rt_sem_wait(&master_sem);
     ecrt_slave_config_state(sc_ana_in, &s);
-    rt_sem_signal(&master_sem);
 
     if (s.al_state != sc_ana_in_state.al_state)
         printk(KERN_INFO PFX "AnaIn: State 0x%02X.\n", s.al_state);
@@ -203,17 +197,12 @@ void check_slave_config_states(void)
 void run(long data)
 {
     while (1) {
-        t_last_cycle = get_cycles();
-
         // receive process data
         rt_sem_wait(&master_sem);
         // disable the debug interface which is not RTAI-safe
         ec_debug_disable(1);
         ecrt_master_receive(master);
         ecrt_domain_process(domain1);
-        // re-enable the debug interface
-        ec_debug_disable(0);
-        rt_sem_signal(&master_sem);
 
         // check process data state (optional)
         check_domain1_state();
@@ -236,15 +225,13 @@ void run(long data)
         // write process data
         EC_WRITE_U8(domain1_pd + off_dig_out, blink ? 0x06 : 0x09);
 
-        rt_sem_wait(&master_sem);
-        // disable the debug interface which is not RTAI-safe
-        ec_debug_disable(1);
         ecrt_domain_queue(domain1);
         ecrt_master_send(master);
         // re-enable the debug interface
         ec_debug_disable(0);
         rt_sem_signal(&master_sem);
 
+        t_last_cycle = get_cycles();
         rt_task_wait_period();
     }
 }
