@@ -1503,6 +1503,7 @@ static int ec_master_idle_thread(void *priv_data)
             master->max_queue_size);
 
     while (!kthread_should_stop()) {
+        ec_master_output_stats(master);
         ec_datagram_output_stats(&master->fsm_datagram);
 
         // receive
