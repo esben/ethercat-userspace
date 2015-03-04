@@ -83,6 +83,82 @@ modules_install:
 		INSTALL_MOD_DIR="$(INSTALL_MOD_DIR)" modules_install
 
 clean-local:
-	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" clean
+	rm -f ethercat_master.1 libethercat_master.pc
 
 #------------------------------------------------------------------------------
+
+# user-space library
+
+lib_LTLIBRARIES = libethercat_master.la
+
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libethercat_master.pc
+EXTRA_DIST += libethercat_master.pc.in
+
+libethercat_master_la_LDFLAGS = -version-info 1:0:0
+
+libethercat_master_la_CFLAGS = -I$(srcdir)/.. \
+	-I../emulation \
+	-D__KERNEL__ \
+	-DEC_HAVE_CYCLES \
+	-DEC_USE_HRTIMER \
+	-DEC_MASTER_IN_USERSPACE \
+	-Wall -Werror \
+	-fno-strict-aliasing
+
+libethercat_master_la_SOURCES = \
+	cdev.c \
+	datagram.c \
+	device.c \
+	domain.c \
+	fmmu_config.c \
+	foe_request.c \
+	fsm_change.c \
+	fsm_coe.c \
+	fsm_foe.c \
+	fsm_master.c \
+	fsm_pdo.c \
+	fsm_pdo_entry.c \
+	fsm_sii.c \
+	fsm_slave.c \
+	fsm_slave_config.c \
+	fsm_slave_scan.c \
+	fsm_soe.c \
+	mailbox.c \
+	master.c \
+	module.c \
+	pdo.c \
+	pdo_entry.c \
+	pdo_list.c \
+	sdo.c \
+	sdo_entry.c \
+	sdo_request.c \
+	slave.c \
+	slave_config.c \
+	soe_errors.c \
+	soe_request.c \
+	sync.c \
+	sync_config.c \
+	voe_handler.c \
+	../devices/generic.c
+if ENABLE_EOE
+libethercat_master_la_SOURCES += ethernet.c
+endif
+
+bin_PROGRAMS = ethercat_master
+
+dist_man_MANS = ethercat_master.1
+
+EXTRA_ethercat_master_DEPENDENCIES = $(lib_LTLIBRARIES)
+
+ethercat_master.1: ethercat_master$(EXEEXT)
+	PATH=".:$$PATH" help2man -o "$@" "$<" -s1 -n"EtherCAT master with no application task" --no-info
+
+ethercat_master_SOURCES = ethercat_master.c
+
+ethercat_master_LDADD = -lethercat_master -lpthread
+
+ethercat_master_CFLAGS = \
+	-fno-strict-aliasing \
+	-DEC_MASTER_IN_USERSPACE \
+	-Wall -Werror

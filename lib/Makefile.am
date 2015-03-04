@@ -42,7 +42,8 @@ clean-local:
 #------------------------------------------------------------------------------
 
 libethercat_la_LDFLAGS = -version-info 1:0:0
-libethercat_la_CFLAGS = -I$(srcdir)/.. -fno-strict-aliasing
+libethercat_la_CFLAGS = -I$(srcdir)/.. -fno-strict-aliasing \
+	-DEC_MASTER_IN_USERSPACE -Wall -Werror
 libethercat_la_SOURCES = \
 	common.c \
 	domain.c \

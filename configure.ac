@@ -28,7 +28,7 @@
 #------------------------------------------------------------------------------
 
 AC_PREREQ(2.59)
-AC_INIT([ethercat],[1.5.0],[fp@igh-essen.com])
+AC_INIT([ethercat],[1.5.0],[f.heckenbach@fh-soft.de])
 AC_CONFIG_AUX_DIR([autoconf])
 AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2])
 AC_PREFIX_DEFAULT([/opt/etherlab])
@@ -48,6 +48,7 @@ AM_PROG_CC_C_O
 # Linux sources
 #------------------------------------------------------------------------------
 
+ifelse([
 AC_ARG_WITH([linux-dir],
     AC_HELP_STRING(
         [--with-linux-dir=<DIR>],
@@ -97,6 +98,7 @@ linuxversion=`echo $kernelrelease | grep -oE "^[[0-9]]+\.[[0-9]]+\.[[0-9]]+"`
 
 AC_SUBST(LINUX_SOURCE_DIR,[$sourcedir])
 AC_MSG_RESULT([$LINUX_SOURCE_DIR (Kernel $linuxversion)])
+])
 
 #------------------------------------------------------------------------------
 # Linux module installation subdirectory
@@ -155,7 +157,7 @@ AC_ARG_ENABLE([8139too],
                 ;;
         esac
     ],
-    [enable8139too=1]
+    [enable8139too=0]
 )
 
 AM_CONDITIONAL(ENABLE_8139TOO, test "x$enable8139too" = "x1")
@@ -689,40 +691,15 @@ AC_CONFIG_FILES([
         Doxyfile
         Kbuild
         Makefile
-        devices/Kbuild
-        devices/Makefile
-        devices/e1000/Kbuild
-        devices/e1000/Makefile
-        devices/e1000e/Kbuild
-        devices/e1000e/Makefile
         ethercat.spec
-        examples/Kbuild
-        examples/Makefile
-        examples/dc_rtai/Kbuild
-        examples/dc_rtai/Makefile
-        examples/dc_user/Makefile
-        examples/mini/Kbuild
-        examples/mini/Makefile
-        examples/rtai/Kbuild
-        examples/rtai/Makefile
-        examples/tty/Kbuild
-        examples/tty/Makefile
-        examples/user/Makefile
         include/Makefile
         lib/Makefile
         lib/libethercat.pc
         m4/Makefile
         master/Kbuild
         master/Makefile
-        script/Makefile
-        script/ethercat.service
-        script/ethercatctl
-        script/init.d/Makefile
-        script/init.d/ethercat
-        script/sysconfig/Makefile
+        master/libethercat_master.pc
         tool/Makefile
-        tty/Kbuild
-        tty/Makefile
 ])
 AC_OUTPUT
 

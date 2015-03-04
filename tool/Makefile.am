@@ -138,6 +138,7 @@ ethercat_CXXFLAGS = \
 	-I$(top_srcdir)/master \
 	-Wall -DREV=$(REV) \
 	-Wall -DREV=$(REV) -Werror \
+	-DEC_MASTER_IN_USERSPACE \
 	-fno-strict-aliasing
 
 #------------------------------------------------------------------------------

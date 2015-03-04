@@ -30,10 +30,8 @@
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = \
-    devices \
     include \
-    master \
-    script
+    master
 
 if BUILD_TOOL
 SUBDIRS += tool
@@ -48,18 +46,13 @@ SUBDIRS += tty
 endif
 
 # userspace example depends on lib/
-SUBDIRS += examples
 
 DIST_SUBDIRS = \
-    devices \
-    examples \
     include \
     lib \
     m4 \
     master \
-    script \
-    tool \
-	tty
+    tool
 
 noinst_HEADERS = \
 	globals.h
@@ -85,7 +78,6 @@ modules_install:
 		INSTALL_MOD_DIR="$(INSTALL_MOD_DIR)" modules_install
 
 clean-local:
-	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" clean
 
 mydist:
 	hg log --style=changelog $(srcdir) > ChangeLog

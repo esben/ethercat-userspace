@@ -7,4 +7,4 @@ Name: libethercat
 Description: EtherCAT client library
 Version: @VERSION@
 Libs: -L${libdir} -lethercat
-Cflags: -I${includedir} -fno-strict-aliasing
+Cflags: -I${includedir} -fno-strict-aliasing -DEC_MASTER_IN_USERSPACE
