@@ -525,11 +525,12 @@ int ecrt_master_set_send_interval(ec_master_t *master,size_t send_interval_us)
 
 /*****************************************************************************/
 
-void ecrt_master_send(ec_master_t *master)
+size_t ecrt_master_send(ec_master_t *master)
 {
     if (ioctl(master->fd, EC_IOCTL_SEND, NULL) == -1) {
         fprintf(stderr, "Failed to send: %s\n", strerror(errno));
     }
+    return 0; // FIXME
 }
 
 /*****************************************************************************/

@@ -817,8 +817,11 @@ int ecrt_master_set_send_interval(
  *
  * Has to be called cyclically by the application after ecrt_master_activate()
  * has returned.
+ *
+ * Returns the number of bytes sent.
+ * FIXME: User-space version always returns 0.
  */
-void ecrt_master_send(
+size_t ecrt_master_send(
         ec_master_t *master /**< EtherCAT master. */
         );
 

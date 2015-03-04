@@ -943,8 +943,9 @@ static int ec_slave_datagram_from_buffer(
 
 /** Sends the datagrams in the queue.
  *
+ * Returns the number of bytes sent.
  */
-void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
+size_t ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
 {
     ec_datagram_t *datagram, *next;
     size_t datagram_size;
@@ -956,6 +957,7 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
     unsigned long jiffies_sent;
     unsigned int frame_count, more_datagrams_waiting;
     struct list_head sent_datagrams;
+    size_t sent_bytes = 0;
 
 #ifdef EC_HAVE_CYCLES
     cycles_start = get_cycles();
@@ -1096,6 +1098,8 @@ break_send:
 
         // send frame
         ec_device_send(&master->main_device, cur_data - frame_data);
+        sent_bytes += ETH_HLEN + cur_data - frame_data + ETH_FCS_LEN
+          + 20  /* preamble and interframe gap */;
 #ifdef EC_HAVE_CYCLES
         cycles_sent = get_cycles();
 #endif
@@ -1113,7 +1117,7 @@ break_send:
 
         frame_count++;
     }
-    while (more_datagrams_waiting);
+    while (more_datagrams_waiting && frame_count < EC_TX_RING_SIZE);
 
 #ifdef EC_HAVE_CYCLES
     if (unlikely(master->debug_level > 1)) {
@@ -1123,6 +1127,7 @@ break_send:
                (unsigned int) (cycles_end - cycles_start) * 1000 / cpu_khz);
     }
 #endif
+    return sent_bytes;
 }
 
 /*****************************************************************************/
@@ -1488,9 +1493,7 @@ static int ec_master_idle_thread(void *priv_data)
     ec_master_t *master = (ec_master_t *) priv_data;
     ec_slave_t *slave = NULL;
     int fsm_exec;
-#ifdef EC_USE_HRTIMER
     size_t sent_bytes;
-#endif
 
     // send interval in IDLE phase
     ec_master_set_send_interval(master, 1000000 / HZ); 
@@ -1524,11 +1527,7 @@ static int ec_master_idle_thread(void *priv_data)
         if (fsm_exec) {
             ec_master_queue_datagram(master, &master->fsm_datagram);
         }
-        ecrt_master_send(master);
-#ifdef EC_USE_HRTIMER
-        sent_bytes = master->main_device.tx_skb[
-            master->main_device.tx_ring_index]->len;
-#endif
+        sent_bytes = ecrt_master_send(master);
         up(&master->io_sem);
 
         if (ec_fsm_master_idle(&master->fsm)) {
@@ -1540,7 +1539,7 @@ static int ec_master_idle_thread(void *priv_data)
 #endif
         } else {
 #ifdef EC_USE_HRTIMER
-            ec_master_nanosleep(sent_bytes * EC_BYTE_TRANSMISSION_TIME_NS);
+            ec_master_nanosleep(sent_bytes * EC_BYTE_TRANSMISSION_TIME_NS * 6 / 5);
 #else
             schedule();
 #endif
@@ -2347,7 +2346,7 @@ void ecrt_master_deactivate(ec_master_t *master)
 
 /*****************************************************************************/
 
-void ecrt_master_send(ec_master_t *master)
+size_t ecrt_master_send(ec_master_t *master)
 {
     ec_datagram_t *datagram, *n;
 
@@ -2376,11 +2375,11 @@ void ecrt_master_send(ec_master_t *master)
 
         // clear frame statistics
         ec_device_clear_stats(&master->main_device);
-        return;
+        return 0;
     }
 
     // send frames
-    ec_master_send_datagrams(master);
+    return ec_master_send_datagrams(master);
 }
 
 /*****************************************************************************/
