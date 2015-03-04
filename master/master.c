@@ -53,6 +53,7 @@
 #include "ethernet.h"
 #endif
 #include "master.h"
+#include "mailbox.h"
 
 /*****************************************************************************/
 
@@ -840,6 +841,11 @@ void ec_master_queue_datagram(
             break;
     }
 
+#ifdef EC_HAVE_CYCLES
+    datagram->cycles_sent = get_cycles();
+#endif
+    datagram->jiffies_sent = jiffies;
+
     /* It is possible, that a datagram in the queue is re-initialized with the
      * ec_datagram_<type>() methods and then shall be queued with this method.
      * In that case, the state is already reset to EC_DATAGRAM_INIT. Check if
@@ -876,6 +882,56 @@ void ec_master_queue_datagram_ext(
 
 /*****************************************************************************/
 
+/* Utility functions */
+
+static int is_zero(const uint8_t *p, size_t n)
+{
+    while (n--)
+        if (*p++)
+            return 0;
+    return 1;
+}
+
+static int ec_slave_datagram_to_buffer(
+        ec_slave_t *slave,
+        uint8_t protocol,
+        ec_datagram_t *datagram)
+{
+    int n = slave->tx_mailbox_buffers_used[protocol];
+    if (n >= EC_MBOX_BUFFERS)
+        return 0;
+    n = (slave->tx_mailbox_buffer_head[protocol] + n) % EC_MBOX_BUFFERS;
+    slave->tx_mailbox_buffer_working_counter[protocol][n] =
+      datagram->working_counter;
+    memcpy(slave->tx_mailbox_buffer + slave->configured_tx_mailbox_size
+             * (protocol * EC_MBOX_BUFFERS + n),
+           datagram->data,
+           slave->configured_tx_mailbox_size);
+    slave->tx_mailbox_buffers_used[protocol]++;
+    return 1;
+}
+
+static int ec_slave_datagram_from_buffer(
+        ec_slave_t *slave,
+        uint8_t protocol,
+        ec_datagram_t *datagram)
+{
+    int n = slave->tx_mailbox_buffer_head[protocol];
+    if (slave->tx_mailbox_buffers_used[protocol] == 0)
+        return 0;
+    datagram->working_counter =
+      slave->tx_mailbox_buffer_working_counter[protocol][n];
+    memcpy(datagram->data,
+           slave->tx_mailbox_buffer + slave->configured_tx_mailbox_size
+             * (protocol * EC_MBOX_BUFFERS + n),
+           slave->configured_tx_mailbox_size);
+    slave->tx_mailbox_buffer_head[protocol] = (n + 1) % EC_MBOX_BUFFERS;
+    slave->tx_mailbox_buffers_used[protocol]--;
+    return 1;
+}
+
+/*****************************************************************************/
+
 /** Sends the datagrams in the queue.
  *
  */
@@ -908,8 +964,51 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
         more_datagrams_waiting = 0;
 
         // fill current frame with datagrams
-        list_for_each_entry(datagram, &master->datagram_queue, queue) {
+        list_for_each_entry_safe(datagram, next, &master->datagram_queue, queue) {
+            ec_slave_t *mbox_slave;
+            uint8_t mbox_prot;
+
             if (datagram->state != EC_DATAGRAM_QUEUED) continue;
+
+            // Do not fetch twice simultaneously from the same mailbox.
+            // Answer from the internal buffer instead of fetching when
+            // necessary.
+            if (ec_slave_is_mbox_datagram(datagram, EC_DATAGRAM_MAILBOX_FETCH,
+                                          &mbox_slave, &mbox_prot)) {
+
+                int can_fetch = mbox_slave->tx_mailbox_filled
+                                && !mbox_slave->tx_mailbox_fetching;
+
+                if (likely(mbox_slave->tx_mailbox_buffer)
+                    && likely(mbox_prot < EC_MBOX_MAX_PROTOCOL)
+                    && mbox_prot != EC_MBOX_NO_PROTOCOL
+                    && (!can_fetch
+                        // try to stop buffers from growing too much
+                        || mbox_slave->tx_mailbox_buffers_used[mbox_prot]
+                             > EC_MBOX_BUFFERS / 2)
+                    && ec_slave_datagram_from_buffer(mbox_slave, mbox_prot, datagram)) {
+                    datagram->state = EC_DATAGRAM_RECEIVED;
+#ifdef EC_HAVE_CYCLES
+                    datagram->cycles_sent = datagram->cycles_received = get_cycles();
+#endif
+                    datagram->jiffies_sent = datagram->jiffies_received = jiffies;
+                    list_del_init(&datagram->queue);
+                    if (unlikely(master->debug_level > 1))
+                        EC_SLAVE_INFO(mbox_slave,"%p fetching mailbox response"
+                          " for protocol %i from buffer\n", datagram, mbox_prot);
+                    continue;  // don't need to send this datagram
+                }
+
+                if (!can_fetch) {
+                    if (mbox_prot == EC_MBOX_NO_PROTOCOL) {
+                        datagram->state = EC_DATAGRAM_INIT;
+                        list_del_init(&datagram->queue);
+                    }
+                    continue;  // nothing to fetch, wait
+                }
+
+                mbox_slave->tx_mailbox_fetching = 1;
+            }
 
             // does the current datagram fit in the frame?
             datagram_size = EC_DATAGRAM_HEADER_SIZE + datagram->data_size
@@ -1044,6 +1143,9 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
 
     cmd_follows = 1;
     while (cmd_follows) {
+        ec_slave_t *mbox_slave;
+        uint8_t mbox_prot;
+
         // process datagram header
         datagram_type  = EC_READ_U8 (cur_data);
         datagram_index = EC_READ_U8 (cur_data + 1);
@@ -1115,6 +1217,106 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
 #endif
         datagram->jiffies_received = master->main_device.jiffies_poll;
         list_del_init(&datagram->queue);
+
+        if (ec_slave_is_mbox_datagram(datagram, EC_DATAGRAM_MAILBOX_CHECK,
+                                      &mbox_slave, &mbox_prot)) {
+            mbox_slave->tx_mailbox_filled = ec_slave_mbox_check(datagram);
+
+            if (likely(mbox_slave->tx_mailbox_buffer)
+                && likely(mbox_prot < EC_MBOX_MAX_PROTOCOL)) {
+
+                if (mbox_slave->tx_mailbox_filled
+                    && mbox_slave->tx_mailbox_buffers_used[mbox_prot] == 0) {
+                    // There is something in the mailbox, but not necessarily
+                    // for this protocol, and we have nothing buffered for it.
+                    // So we reply "no" and fetch the mailbox internally.
+                    if (mbox_slave->tx_fetch.state != EC_DATAGRAM_QUEUED
+                        && mbox_slave->tx_fetch.state != EC_DATAGRAM_SENT
+                        && !ec_slave_mbox_prepare_fetch(mbox_slave,
+                              &mbox_slave->tx_fetch, EC_MBOX_NO_PROTOCOL)) {
+                        ec_master_queue_datagram(master, &mbox_slave->tx_fetch);
+                    }
+                    ec_slave_mbox_override_check(datagram, 0);
+                    if (unlikely(master->debug_level > 1))
+                        EC_SLAVE_INFO(mbox_slave, "%p overriding mailbox"
+                          " check = 0 for protocol %i\n", datagram, mbox_prot);
+                }
+
+                if (mbox_slave->tx_mailbox_buffers_used[mbox_prot] != 0
+                    && !mbox_slave->tx_mailbox_filled) {
+                    // There is nothing in the mailbox, but we have something
+                    // buffered for this protocol. So we reply "yes" and
+                    // answer the following fetch datagram from the buffer.
+                    ec_slave_mbox_override_check(datagram, 1);
+                    if (unlikely(master->debug_level > 1))
+                        EC_SLAVE_INFO(mbox_slave, "%p overriding mailbox"
+                          " check = 1 for protocol %i\n", datagram, mbox_prot);
+                }
+            }
+        }
+
+        if (ec_slave_is_mbox_datagram(datagram, EC_DATAGRAM_MAILBOX_FETCH,
+                                      &mbox_slave, &mbox_prot)) {
+            mbox_slave->tx_mailbox_filled = mbox_slave->tx_mailbox_fetching = 0;
+            if (likely(mbox_slave->tx_mailbox_buffer)
+                && likely(mbox_prot < EC_MBOX_MAX_PROTOCOL)) {
+                uint8_t actual_mbox_prot;
+                size_t data_size;
+
+                // quick check for empty datagrams to avoid spurious error messages
+                if (datagram->working_counter == 0
+                    || (EC_READ_U8(datagram->data + 5) == 0
+                        && EC_READ_U16(datagram->data + 8) == 0
+                        && is_zero(datagram->data + EC_MBOX_HEADER_SIZE,
+                             EC_READ_U16(datagram->data)))) {
+                    EC_SLAVE_WARN(mbox_slave, "mailbox empty unexpectedly"
+                          " (protocol %i)\n", mbox_prot);
+                    actual_mbox_prot = EC_MBOX_NO_PROTOCOL;
+                } else if (IS_ERR(ec_slave_mbox_fetch(mbox_slave, datagram,
+                                    &actual_mbox_prot, &data_size))
+                           || data_size > mbox_slave->configured_tx_mailbox_size) {
+                    EC_SLAVE_WARN(mbox_slave, "invalid mailbox response\n");
+                    actual_mbox_prot = EC_MBOX_NO_PROTOCOL;
+                }
+
+                // If the response is for a different protocol, exchange the
+                // datagram with a buffered one if possible. Also do so if it
+                // is the wanted protocol, but there is something buffered for
+                // it so datagrams are returned in the correct order.
+                if (actual_mbox_prot != mbox_prot
+                    || mbox_slave->tx_mailbox_buffers_used[mbox_prot] != 0) {
+
+                    if (actual_mbox_prot != EC_MBOX_NO_PROTOCOL) {
+                        if (ec_slave_datagram_to_buffer(mbox_slave,
+                              actual_mbox_prot, datagram)) {
+                            if (unlikely(master->debug_level > 1))
+                                EC_SLAVE_INFO(mbox_slave, "%p buffering"
+                                  " mailbox response for protocol %i\n",
+                                  datagram, actual_mbox_prot);
+                        } else {
+                            EC_SLAVE_WARN(mbox_slave, "mailbox protocol %i "
+                              "buffer overflow, discarding response\n",
+                              actual_mbox_prot);
+                        }
+                    }
+
+                    if (mbox_prot != EC_MBOX_NO_PROTOCOL) {
+                        if (ec_slave_datagram_from_buffer(mbox_slave,
+                              mbox_prot, datagram)) {
+                            if (unlikely(master->debug_level > 1))
+                                EC_SLAVE_INFO(mbox_slave, "%p reading mailbox"
+                                  " response for protocol %i from buffer\n",
+                                  datagram, mbox_prot);
+                        } else {
+                            EC_SLAVE_WARN(mbox_slave,
+                              "mailbox protocol %i response lost\n", mbox_prot);
+                            // so ec_slave_mbox_fetch will report an error
+                            ec_datagram_zero(datagram);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2109,6 +2311,11 @@ void ecrt_master_send(ec_master_t *master)
     if (unlikely(!master->main_device.link_state)) {
         // link is down, no datagram can be sent
         list_for_each_entry_safe(datagram, n, &master->datagram_queue, queue) {
+            ec_slave_t *mbox_slave;
+            uint8_t mbox_prot;
+            if (ec_slave_is_mbox_datagram(datagram, EC_DATAGRAM_MAILBOX_FETCH,
+                                          &mbox_slave, &mbox_prot))
+                mbox_slave->tx_mailbox_filled = mbox_slave->tx_mailbox_fetching = 0;
             datagram->state = EC_DATAGRAM_ERROR;
             list_del_init(&datagram->queue);
         }
@@ -2136,15 +2343,26 @@ void ecrt_master_receive(ec_master_t *master)
 
     // dequeue all datagrams that timed out
     list_for_each_entry_safe(datagram, next, &master->datagram_queue, queue) {
-        if (datagram->state != EC_DATAGRAM_SENT) continue;
+        if (datagram->state != EC_DATAGRAM_SENT
+            && datagram->state != EC_DATAGRAM_QUEUED)
+            continue;
 
 #ifdef EC_HAVE_CYCLES
-        if (master->main_device.cycles_poll - datagram->cycles_sent
+        if (datagram->cycles_sent - master->main_device.cycles_poll
+                > timeout_cycles
+            && master->main_device.cycles_poll - datagram->cycles_sent
                 > timeout_cycles) {
 #else
-        if (master->main_device.jiffies_poll - datagram->jiffies_sent
+        if (datagram->jiffies_sent - master->main_device.jiffies_poll
+                > timeout_jiffies
+            && master->main_device.jiffies_poll - datagram->jiffies_sent
                 > timeout_jiffies) {
 #endif
+            ec_slave_t *mbox_slave;
+            uint8_t mbox_prot;
+            if (ec_slave_is_mbox_datagram(datagram, EC_DATAGRAM_MAILBOX_FETCH,
+                                          &mbox_slave, &mbox_prot))
+                mbox_slave->tx_mailbox_filled = mbox_slave->tx_mailbox_fetching = 0;
             list_del_init(&datagram->queue);
             datagram->state = EC_DATAGRAM_TIMED_OUT;
             master->stats.timeouts++;
